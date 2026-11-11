@@ -6,12 +6,19 @@
 # confirm = "..."  -> פרט שעוד צריך לאשר מול המציאות.
 
 [[store]]
+key = "rami-levy-yahalom"
+chain = "rami-levy"
+store_id = "068"
+name = "רמי לוי יהלום נתניה (ליד ג'מבו, מול היהלום)"
+role = "primary"
+
+[[store]]
 key = "rami-levy-orzim"
 chain = "rami-levy"
 store_id = "037"
 name = "רמי לוי נתניה צפון (האורזים 8)"
-role = "primary"
-confirm = "האם זה הסניף הצמוד לג'מבו?"
+role = "secondary"
+enabled = false
 
 [[store]]
 key = "shufersal-deal-hakadar"
