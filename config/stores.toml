@@ -33,7 +33,6 @@ chain = "yochananof"
 store_id = "030"
 name = "יוחננוף נתניה"
 role = "primary"
-confirm = "ליוחננוף יש שני סניפים בנתניה (030 'נתניה' ו-050 'נתניה הדרים'). לאיזה הולכים?"
 
 [[store]]
 key = "yochananof-hadarim"
@@ -41,7 +40,6 @@ chain = "yochananof"
 store_id = "050"
 name = "יוחננוף נתניה הדרים"
 role = "primary"
-confirm = "ראו הערה ב-yochananof-netanya"
 
 [[store]]
 key = "osher-ad-netanya"
