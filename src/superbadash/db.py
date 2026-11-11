@@ -13,6 +13,7 @@ Model:
   promotions       promotions (header), first_seen/last_seen tracked over time
   promo_items      products in each promotion with promo price / min. quantity
   ingest_runs      run log, so the same file isn't processed twice
+  deals            deal-engine output (the site reads it)
 """
 
 from __future__ import annotations
@@ -100,6 +101,23 @@ CREATE TABLE IF NOT EXISTS ingest_runs (
     PRIMARY KEY (store_key, kind, file_name)
 );
 
+CREATE TABLE IF NOT EXISTS deals (
+    store_key         TEXT NOT NULL,
+    code              TEXT NOT NULL,
+    promo_id          TEXT,
+    description       TEXT,
+    regular_price     REAL,
+    promo_unit_price  REAL,
+    min_qty           REAL,
+    discount_pct      REAL,
+    market_saving_pct REAL,
+    verdict           TEXT NOT NULL,
+    flags             TEXT,
+    end_at            TEXT,
+    computed_at       TEXT NOT NULL,
+    PRIMARY KEY (store_key, code)
+);
+
 CREATE INDEX IF NOT EXISTS ix_products_barcode ON products(barcode);
 CREATE INDEX IF NOT EXISTS ix_promo_items_code ON promo_items(code);
 CREATE INDEX IF NOT EXISTS ix_price_changes_code ON price_changes(code, changed_at);
@@ -160,6 +178,28 @@ class DB:
         except Exception:
             self.conn.rollback()
             raise
+
+    def migrate(self, directory: str) -> list[str]:
+        """Apply SQL migrations (Postgres/Supabase only) in file-name order, each exactly once."""
+        if self.kind != "postgres":
+            return []
+        import glob
+        self.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)")
+        self.execute("ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY")
+        self.conn.commit()
+        done = {r["version"] for r in self.query("SELECT version FROM schema_migrations")}
+        applied = []
+        for path in sorted(glob.glob(os.path.join(directory, "*.sql"))):
+            version = os.path.basename(path)
+            if version in done:
+                continue
+            with open(path, encoding="utf-8") as f:
+                sql = f.read()
+            with self.transaction():
+                self.conn.cursor().execute(sql)  # the whole file in one transaction
+                self.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)", (version, now_iso()))
+            applied.append(version)
+        return applied
 
     def close(self) -> None:
         self.conn.close()

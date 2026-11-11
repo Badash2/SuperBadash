@@ -162,3 +162,11 @@ def test_compare(db):
     res = compare(db, "במבה")
     assert res and res[0]["prices"]["rl"] == {"regular": 4.0, "promo": 3.333}
     assert compare(db, "7290000066318")[0]["code"] == "7290000066318"
+
+
+def test_min_purchase_is_conditional(db):
+    _load(db)
+    db.execute("UPDATE promotions SET description = 'במבה 3 ב-10 מות100' WHERE promo_id = '1'")
+    db.conn.commit()
+    d = {d.promo_id: d for d in analyse(db, NOW)}["1"]
+    assert "min_purchase_100" in d.flags and d.verdict == "conditional"

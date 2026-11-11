@@ -5,6 +5,8 @@
   compare    compare a product's price across stores (name or barcode)
   discover   list a chain's branches in a city (to find a store_id)
   status     data status: when each store was last updated
+  migrate    apply the site's DB migrations (supabase/migrations)
+  publish-deals  write the analysis to the deals table for the site
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ import logging
 import sys
 
 from .db import DB
-from .deals import analyse, compare
+from .deals import analyse, compare, publish
 from .ingest import DEFAULT_CONFIG, load_stores, run
 from .parse import parse_stores
 from .sources import CHAINS, client_for
@@ -107,6 +109,23 @@ def cmd_discover(a) -> int:
     return 0
 
 
+def cmd_migrate(a) -> int:
+    db = DB(a.db)
+    db.init_schema()
+    applied = db.migrate(a.dir)
+    print("applied:", ", ".join(applied) if applied else "nothing new" if db.kind == "postgres" else "skipped (sqlite)")
+    db.close()
+    return 0
+
+
+def cmd_publish(a) -> int:
+    db = DB(a.db)
+    db.init_schema()
+    print(f"published {publish(db)} deals")
+    db.close()
+    return 0
+
+
 def cmd_status(a) -> int:
     db = DB(a.db)
     db.init_schema()
@@ -149,6 +168,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("chain", choices=sorted(CHAINS))
     s.add_argument("--city", help="CBS city code (Netanya=7400) or part of the name")
     s.set_defaults(fn=cmd_discover)
+
+    s = sub.add_parser("migrate", help="apply supabase/migrations (Postgres only)")
+    s.add_argument("--dir", default="supabase/migrations")
+    s.set_defaults(fn=cmd_migrate)
+
+    s = sub.add_parser("publish-deals", help="write the deals analysis to the deals table for the site")
+    s.set_defaults(fn=cmd_publish)
 
     s = sub.add_parser("status")
     s.set_defaults(fn=cmd_status)

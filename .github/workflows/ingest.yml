@@ -8,6 +8,11 @@ on:
     - cron: "17 11 * * *"  # ~13:17
     - cron: "17 18 * * *"  # ~20:17
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "src/superbadash/**"
 
 concurrency:
   group: ingest
@@ -32,7 +37,9 @@ jobs:
             echo "::warning::DATABASE_URL secret is not set - running against a throwaway SQLite (no history is kept)."
             export DATABASE_URL=sqlite:///data/run.sqlite
           fi
+          superbadash migrate
           superbadash ingest
+          superbadash publish-deals
           superbadash status
           superbadash deals --top 25 > deals.txt
           superbadash deals --verdict all --top 100000 --json > deals.json

@@ -19,6 +19,7 @@ promotion is checked against:
 
 from __future__ import annotations
 
+import re
 import statistics
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,7 @@ def _parse(ts: str | None) -> datetime | None:
         return None
 
 
+MIN_PURCHASE_RE = re.compile(r"מות\s?(\d{2,4})")
 SPEND_THRESHOLD_QTY = 100  # a MinQty above this on a non-weighed item = spend amount in agorot, not a quantity
 
 
@@ -194,8 +196,13 @@ def analyse(db: DB, now: datetime | None = None) -> list[Deal]:
             flags.append("club_only")
         if r["is_coupon"]:
             flags.append("coupon")
-        if r["min_purchase"]:
-            flags.append(f"min_purchase_{r['min_purchase']:g}")
+        # Minimum spend: from the field, or from the description ("...-מות100" = conditional on buying 100 ILS)
+        min_purchase = r["min_purchase"]
+        if not min_purchase:
+            m = MIN_PURCHASE_RE.search(r["description"] or "")
+            min_purchase = float(m.group(1)) if m else None
+        if min_purchase:
+            flags.append(f"min_purchase_{min_purchase:g}")
         if r["min_qty"] and r["min_qty"] > 1 and not r["is_weighted"]:
             flags.append(f"multi_buy_{r['min_qty']:g}")
         if unit < regular * 0.25:
@@ -230,7 +237,7 @@ def analyse(db: DB, now: datetime | None = None) -> list[Deal]:
         market_saving = 1 - unit / reference if reference > 0 else 0.0
         if "price_raised" in flags:
             verdict = "fake"  # the regular price was raised before the promotion - an inflated discount
-        elif {"coupon", "club_only", "check_terms"} & set(flags):
+        elif {"coupon", "club_only", "check_terms"} & set(flags) or any(f.startswith("min_purchase_") for f in flags):
             verdict = "conditional"  # a real price but with a condition (coupon/club/hidden terms)
         elif "evergreen" in flags:
             verdict = "permanent"  # runs for months = the real price. Fine to buy, no reason to stock up
@@ -279,3 +286,17 @@ def compare(db: DB, query: str, limit: int = 20) -> list[dict]:
                 prices[r["store_key"]] = {"regular": r["price"], "promo": promos.get((r["store_key"], p["code"]))}
         out.append({**p, "prices": prices})
     return out
+
+
+def publish(db: DB, now: datetime | None = None) -> int:
+    """Write the analysis to the `deals` table, which the site reads. Replaces the whole snapshot."""
+    deals = analyse(db, now)
+    ts = (now or datetime.now(timezone.utc).replace(tzinfo=None)).strftime("%Y-%m-%dT%H:%M:%S")
+    rows = [(d.store_key, d.code, d.promo_id, d.description, d.regular_price, d.promo_unit_price, d.min_qty,
+             d.discount_pct, d.market_saving_pct, d.verdict, ",".join(d.flags), d.end_at, ts) for d in deals]
+    with db.transaction():
+        db.execute("DELETE FROM deals")
+        db.executemany("""INSERT INTO deals (store_key, code, promo_id, description, regular_price, promo_unit_price,
+                          min_qty, discount_pct, market_saving_pct, verdict, flags, end_at, computed_at)
+                          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
+    return len(rows)
