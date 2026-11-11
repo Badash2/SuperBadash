@@ -14,7 +14,7 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
 
   if (priced.length === 0) {
     return (
-      <div className="py-12 text-center text-slate-500">
+      <div className="py-12 text-center text-muted">
         כדי להשוות, הוסיפו לרשימה מוצרים מתוך החיפוש (לא טקסט חופשי).
       </div>
     );
@@ -72,13 +72,13 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950">
-        <div className="text-sm text-emerald-800 dark:text-emerald-200">הכי משתלם לסל הזה</div>
+      <section className="rounded-xl bg-brand-soft p-4">
+        <div className="text-sm text-brand">הכי משתלם לסל הזה</div>
         <div className="text-2xl font-bold">
           {storeShort(bestSingle.store)} · {ils(bestSingle.total)}
         </div>
         {bestSingle.missing.length > 0 && (
-          <div className="text-xs text-amber-700">חסרים שם: {bestSingle.missing.map((m) => m.name).join(", ")}</div>
+          <div className="text-xs text-warn">חסרים שם: {bestSingle.missing.map((m) => m.name).join(", ")}</div>
         )}
         {bestPair && pairSaving >= SPLIT_WORTH_IT && (
           <div className="mt-2 text-sm">
@@ -87,24 +87,24 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
           </div>
         )}
         {bestPair && pairSaving > 0 && pairSaving < SPLIT_WORTH_IT && (
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-muted">
             חלוקה לשני סופרים הייתה חוסכת רק {ils(pairSaving)}, לא שווה נסיעה נוספת.
           </div>
         )}
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold text-slate-500">כל הסניפים ({priced.length} מוצרים)</h3>
+        <h3 className="text-sm font-semibold text-muted">כל הסניפים ({priced.length} מוצרים)</h3>
         {totals.map((t) => (
           <div key={t.store} className="space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">{storeShort(t.store)}</span>
               <span className="tabular-nums">
                 {ils(t.total)}
-                {t.missing.length > 0 && <span className="text-xs text-amber-700"> (חסרים {t.missing.length})</span>}
+                {t.missing.length > 0 && <span className="text-xs text-warn"> (חסרים {t.missing.length})</span>}
               </span>
             </div>
-            <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
+            <div className="h-2 rounded-full bg-surface-2">
               <div
                 className="h-2 rounded-full"
                 style={{ width: `${maxTotal ? (t.total / maxTotal) * 100 : 0}%`, background: storeColor(t.store) }}
@@ -116,13 +116,13 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
 
       {bestPair && pairSaving >= SPLIT_WORTH_IT && (
         <section className="space-y-2">
-          <h3 className="text-sm font-semibold text-slate-500">חלוקה מומלצת</h3>
+          <h3 className="text-sm font-semibold text-muted">חלוקה מומלצת</h3>
           {[bestPair.a, bestPair.b].map((s) => (
-            <div key={s} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <div key={s} className="rounded-xl border border-line p-3">
               <div className="mb-1 font-semibold" style={{ color: storeColor(s) }}>
                 {storeShort(s)}
               </div>
-              <ul className="text-sm text-slate-600 dark:text-slate-300">
+              <ul className="text-sm text-muted">
                 {priced
                   .filter((it) => bestPair!.assign.get(it.id) === s)
                   .map((it) => (
@@ -135,7 +135,7 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
       )}
 
       {unpriced.length > 0 && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           לא נכללו בהשוואה (טקסט חופשי או בלי מחיר): {unpriced.map((u) => u.name).join(", ")}
         </p>
       )}

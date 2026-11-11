@@ -3,7 +3,8 @@ import type { ProductInfo } from "@/lib/types";
 import { proteinDensity } from "@/lib/nutrition";
 
 const NUTRI: Record<string, string> = {
-  a: "bg-emerald-600", b: "bg-lime-500", c: "bg-yellow-400 text-slate-900", d: "bg-orange-500", e: "bg-rose-600",
+  // The official Nutri-Score colours (a fixed meaning, so not from the theme)
+  a: "bg-[#038141]", b: "bg-[#85bb2f]", c: "bg-[#fecb02] !text-[#1a1a1a]", d: "bg-[#ee8100]", e: "bg-[#e63e11]",
 };
 
 /** Compact nutrition: kcal and protein per 100g, protein per 100 kcal (colour = how "worth it" for protein). */
@@ -11,14 +12,14 @@ export function NutritionChip({ info }: { info?: ProductInfo }) {
   if (!info || !info.found || info.kcal_100g == null) return null;
   const pd = proteinDensity(info);
   const pdCls =
-    pd == null ? "" : pd >= 10 ? "text-emerald-700 dark:text-emerald-400" : pd >= 5 ? "text-amber-700 dark:text-amber-400" : "text-slate-500";
+    pd == null ? "" : pd >= 10 ? "text-brand" : pd >= 5 ? "text-warn" : "text-muted";
   return (
     <span
-      className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500 dark:text-slate-400"
+      className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted"
       title="ערכים ל-100 גרם. חלבון/100 קל׳ = כמה חלבון מקבלים על כל 100 קלוריות"
     >
       {info.nutriscore && (
-        <span className={`rounded px-1 font-bold uppercase text-white ${NUTRI[info.nutriscore] ?? "bg-slate-400"}`}>
+        <span className={`rounded px-1 font-bold uppercase text-white ${NUTRI[info.nutriscore] ?? "bg-faint"}`}>
           {info.nutriscore}
         </span>
       )}

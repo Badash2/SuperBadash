@@ -18,11 +18,11 @@ export function isGoodDeal(r: PriceRow): boolean {
 }
 
 export const VERDICT: Record<string, { label: string; cls: string }> = {
-  real: { label: "מבצע אמיתי", cls: "bg-emerald-100 text-emerald-800" },
-  conditional: { label: "מבצע מותנה", cls: "bg-amber-100 text-amber-800" },
-  permanent: { label: "מבצע קבוע", cls: "bg-slate-100 text-slate-700" },
-  meh: { label: "מבצע", cls: "bg-sky-100 text-sky-800" },
-  fake: { label: "מבצע מזויף", cls: "bg-rose-100 text-rose-800" },
+  real: { label: "מבצע אמיתי", cls: "bg-accent-soft text-accent" },
+  conditional: { label: "מבצע מותנה", cls: "bg-warn-soft text-warn" },
+  permanent: { label: "מבצע קבוע", cls: "bg-surface-2 text-muted" },
+  meh: { label: "מבצע", cls: "bg-info-soft text-info" },
+  fake: { label: "מבצע מזויף", cls: "bg-danger/15 text-danger" },
 };
 
 export const ils = (n: number) => `₪${n.toFixed(2)}`;

@@ -1,22 +1,103 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(@media (prefers-color-scheme: dark)));
-
+/*
+ * Design system: semantic tokens. Every colour in the app comes from here, with a matched pair
+ * for light and dark - so dark mode is always consistent (no white cards on a dark background).
+ * Brand: fresh green (food, health). Accent: orange - reserved for deals only.
+ */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --bg: #f3f5f1;
+  --surface: #ffffff;
+  --surface-2: #edf1eb;
+  --line: #dde4dc;
+  --fg: #16201a;
+  --muted: #5d6a62;
+  --faint: #8b968f;
+  --brand: #0e7a4b;
+  --brand-strong: #0a5f3a;
+  --brand-fg: #ffffff;
+  --brand-soft: #e1f2e8;
+  --accent: #d9530c;
+  --accent-soft: #ffeedf;
+  --warn: #a35a00;
+  --warn-soft: #fff3d6;
+  --danger: #c43a2b;
+  --info-soft: #e6f0fa;
+  --info: #1f5f99;
+  --img-bg: #ffffff;
+  --shadow: 0 1px 2px rgb(16 32 24 / 0.06), 0 1px 1px rgb(16 32 24 / 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #020617;
-    --foreground: #e2e8f0;
+    --bg: #0d1310;
+    --surface: #161e19;
+    --surface-2: #202a24;
+    --line: #2a3530;
+    --fg: #e9efea;
+    --muted: #a0aca5;
+    --faint: #727e77;
+    --brand: #3cc985;
+    --brand-strong: #5ad89a;
+    --brand-fg: #062014;
+    --brand-soft: #15301f;
+    --accent: #ff8f45;
+    --accent-soft: #3a2415;
+    --warn: #f0b04a;
+    --warn-soft: #362a12;
+    --danger: #ff7a6b;
+    --info-soft: #14263a;
+    --info: #8cc2f5;
+    --img-bg: #ffffff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-img: var(--img-bg);
+  --shadow-card: var(--shadow);
+  --font-sans: var(--font-heebo), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans Hebrew", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+/* Hide the horizontal scrollbar on the quick-add chip row */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

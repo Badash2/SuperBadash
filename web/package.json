@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
+    "barcode-detector": "^3.2.2",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0"
