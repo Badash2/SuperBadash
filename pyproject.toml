@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superbadash"
+version = "0.1.0"
+description = "מעקב מחירים ומבצעים בסופרמרקטים לפי חוק שקיפות המחירים, ורשימת קניות חכמה לבית"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+superbadash = "superbadash.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

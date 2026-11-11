@@ -1,0 +1,45 @@
+name: ingest-prices
+
+# Downloads prices and promotions from all chains three times a day.
+# The chains publish PriceFull/PromoFull files several times a day; three runs catch every change.
+on:
+  schedule:
+    - cron: "17 4 * * *"   # ~06:17 Israel time
+    - cron: "17 11 * * *"  # ~13:17
+    - cron: "17 18 * * *"  # ~20:17
+  workflow_dispatch: {}
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ".[postgres]"
+      - name: Ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::DATABASE_URL secret is not set - running against a throwaway SQLite (no history is kept)."
+            export DATABASE_URL=sqlite:///data/run.sqlite
+          fi
+          superbadash ingest
+          superbadash status
+          superbadash deals --top 25 > deals.txt
+          superbadash deals --verdict all --top 100000 --json > deals.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deals-${{ github.run_id }}
+          path: |
+            deals.txt
+            deals.json
+          retention-days: 14

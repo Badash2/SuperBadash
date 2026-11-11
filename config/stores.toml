@@ -1,0 +1,61 @@
+# הסניפים שנעקוב אחריהם. מזהי הסניפים (store_id) נלקחו מקובצי Stores
+# הרשמיים שכל רשת מפרסמת לפי חוק שקיפות המחירים (נכון ל-11/2026).
+# כדי למצוא סניפים נוספים:  superbadash discover --city 7400   (7400 = סמל הלמ"ס של נתניה)
+#
+# enabled = false  -> הסניף מוגדר אבל לא נמשך.
+# confirm = "..."  -> פרט שעוד צריך לאשר מול המציאות.
+
+[[store]]
+key = "rami-levy-orzim"
+chain = "rami-levy"
+store_id = "037"
+name = "רמי לוי נתניה צפון (האורזים 8)"
+role = "primary"
+confirm = "האם זה הסניף הצמוד לג'מבו?"
+
+[[store]]
+key = "shufersal-deal-hakadar"
+chain = "shufersal"
+store_id = "396"
+name = "שופרסל דיל הקדר (האורזים 2, אזור התעשייה הישן)"
+role = "primary"
+
+[[store]]
+key = "yochananof-netanya"
+chain = "yochananof"
+store_id = "030"
+name = "יוחננוף נתניה"
+role = "primary"
+confirm = "ליוחננוף יש שני סניפים בנתניה (030 'נתניה' ו-050 'נתניה הדרים'). לאיזה הולכים?"
+
+[[store]]
+key = "yochananof-hadarim"
+chain = "yochananof"
+store_id = "050"
+name = "יוחננוף נתניה הדרים"
+role = "primary"
+confirm = "ראו הערה ב-yochananof-netanya"
+
+[[store]]
+key = "osher-ad-netanya"
+chain = "osher-ad"
+store_id = "023"
+name = "אושר עד נתניה (שד' תום לנטוס)"
+role = "primary"
+
+# תוספת שלי: שופרסל יוניברס הוא פורמט ה"סיטונאי" (המחירים הנמוכים ביותר) של שופרסל,
+# והוא נמצא באזור התעשייה הישן, ליד שופרסל דיל הקדר.
+[[store]]
+key = "shufersal-universe-hamelacha"
+chain = "shufersal"
+store_id = "129"
+name = "שופרסל יוניברס (המלאכה 32, אזור התעשייה הישן)"
+role = "secondary"
+
+[[store]]
+key = "rami-levy-poleg"
+chain = "rami-levy"
+store_id = "024"
+name = "רמי לוי נתניה פולג (המחקר 3)"
+role = "secondary"
+enabled = false

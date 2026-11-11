@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+  <ChainID>7290058140886</ChainID><SubChainID>001</SubChainID><StoreID>037</StoreID><BikoretNo>3</BikoretNo>
+  <Items>
+    <Item>
+      <PriceUpdateTime>2026-11-01T08:00:00.000</PriceUpdateTime><ItemCode>7290000066318</ItemCode><ItemType>1</ItemType>
+      <ItemName>במבה 80 גרם</ItemName><ManufactureName>אסם</ManufactureName><Quantity>80.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure><bIsWeighted>0</bIsWeighted><ItemPrice>4.00</ItemPrice>
+      <UnitOfMeasurePrice>5.00</UnitOfMeasurePrice>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2026-11-01T08:00:00</PriceUpdateTime><ItemCode>7290004131074</ItemCode><ItemType>1</ItemType>
+      <ItemName>חלב 3% 1 ליטר</ItemName><ManufactureName>תנובה</ManufactureName><Quantity>1</Quantity>
+      <UnitOfMeasure>ליטר</UnitOfMeasure><bIsWeighted>0</bIsWeighted><ItemPrice>7.20</ItemPrice>
+    </Item>
+    <Item>
+      <ItemCode>400433</ItemCode><ItemType>0</ItemType><ItemName>שישליק הודו</ItemName>
+      <bIsWeighted>1</bIsWeighted><ItemPrice>39.90</ItemPrice><UnitOfMeasure>קג</UnitOfMeasure>
+    </Item>
+    <Item>
+      <ItemCode>7290016733716</ItemCode><ItemType>1</ItemType><ItemName>וופלים 500 גרם</ItemName>
+      <bIsWeighted>0</bIsWeighted><ItemPrice>10.00</ItemPrice>
+    </Item>
+    <Item>
+      <ItemCode>7290000114187</ItemCode><ItemType>1</ItemType><ItemName>טופיפי 125 גרם</ItemName>
+      <bIsWeighted>0</bIsWeighted><ItemPrice>12.80</ItemPrice>
+    </Item>
+  </Items>
+</Root>

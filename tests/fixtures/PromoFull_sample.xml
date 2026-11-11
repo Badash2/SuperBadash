@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+  <ChainID>7290058140886</ChainID><SubChainID>001</SubChainID><StoreID>037</StoreID>
+  <Promotions>
+    <Promotion>
+      <PromotionID>1</PromotionID><PromotionDescription>במבה 3 ב-10</PromotionDescription>
+      <PromotionStartDateTime>2026-11-01T00:00:00.000</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-11-30T23:59:00.000</PromotionEndDateTime>
+      <ClubID>0 - כלל הלקוחות</ClubID><AdditionalIsCoupon>0</AdditionalIsCoupon>
+      <Groups><Group><GroupID>1</GroupID><MinPurchaseAmount></MinPurchaseAmount><PromotionItems>
+        <PromotionItem><ItemCode>7290000066318</ItemCode><ItemType>1</ItemType><RewardType>10</RewardType>
+          <MinQty>3</MinQty><DiscountedPrice>10.00</DiscountedPrice><DiscountRate>16.67</DiscountRate></PromotionItem>
+      </PromotionItems></Group></Groups>
+    </Promotion>
+    <Promotion>
+      <PromotionID>2</PromotionID><PromotionDescription>וופלים ב-8.90 (קבוע)</PromotionDescription>
+      <PromotionStartDateTime>2023-06-18T00:00:00.000</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-12-31T23:59:00.000</PromotionEndDateTime>
+      <ClubID>0</ClubID>
+      <Groups><Group><PromotionItems>
+        <PromotionItem><ItemCode>7290016733716</ItemCode><ItemType>1</ItemType><RewardType>3</RewardType>
+          <MinQty>1</MinQty><DiscountedPrice>8.90</DiscountedPrice></PromotionItem>
+      </PromotionItems></Group></Groups>
+    </Promotion>
+    <Promotion>
+      <PromotionID>3</PromotionID><PromotionDescription>טופיפי השני בחצי מחיר</PromotionDescription>
+      <PromotionStartDateTime>2026-11-05T00:00:00</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-11-25T23:59:00</PromotionEndDateTime>
+      <ClubID>0</ClubID>
+      <Groups><Group><PromotionItems>
+        <PromotionItem><ItemCode>7290000114187</ItemCode><ItemType>1</ItemType><RewardType>2</RewardType>
+          <MinQty>2</MinQty><DiscountedPrice>6.40</DiscountedPrice><DiscountRate>50</DiscountRate></PromotionItem>
+      </PromotionItems></Group></Groups>
+    </Promotion>
+    <Promotion>
+      <PromotionID>4</PromotionID><PromotionDescription>קנה ב-59.90 קבל מתנה</PromotionDescription>
+      <PromotionStartDateTime>2026-11-01T00:00:00</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-11-30T23:59:00</PromotionEndDateTime>
+      <ClubID>0</ClubID>
+      <Groups><Group><PromotionItems>
+        <PromotionItem><ItemCode>7290004131074</ItemCode><ItemType>1</ItemType><RewardType>0</RewardType>
+          <MinQty>5990</MinQty><DiscountedPrice>7.20</DiscountedPrice></PromotionItem>
+      </PromotionItems></Group></Groups>
+    </Promotion>
+    <Promotion>
+      <PromotionID>5</PromotionID><PromotionDescription>שישליק הודו 29.90 לקג</PromotionDescription>
+      <PromotionStartDateTime>2026-11-01T00:00:00</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-11-30T23:59:00</PromotionEndDateTime>
+      <ClubID>0</ClubID>
+      <Groups><Group><PromotionItems>
+        <PromotionItem><ItemCode>400433</ItemCode><ItemType>0</ItemType><RewardType>3</RewardType>
+          <MinQty>0.01</MinQty><DiscountedPrice>29.90</DiscountedPrice><bIsWeighted>1</bIsWeighted></PromotionItem>
+      </PromotionItems></Group></Groups>
+    </Promotion>
+  </Promotions>
+</Root>

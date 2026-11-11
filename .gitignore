@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+data/
+deals.txt
+deals.json
+.env
+.env.*
+node_modules/
+.next/
+.vercel/
