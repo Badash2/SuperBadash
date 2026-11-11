@@ -548,7 +548,7 @@ function Main({ session }: { session: Session }) {
           <CompareView items={items} prices={prices} stores={stores} />
         )}
         {tab === "deals" && (
-          <DealsView myCodes={myCodes} onAdd={(i) => onAdd(i)} />
+          <DealsView myCodes={myCodes} stores={stores} initialStore={currentStore} onAdd={(i) => onAdd(i)} />
         )}
       </main>
 

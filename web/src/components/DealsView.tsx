@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ils, VERDICT } from "@/lib/pricing";
-import { storeShort } from "@/lib/stores";
+import { storeColor, storeShort } from "@/lib/stores";
+import type { Store } from "@/lib/types";
 import { ProductImage } from "./ProductImage";
 
 type DealRow = {
@@ -19,69 +20,183 @@ type DealRow = {
   barcode?: string | null;
 };
 
-/** Real deals: first on products you actually buy, then the best in the area. */
-export function DealsView({ myCodes, onAdd }: { myCodes: string[]; onAdd: (i: { code: string; name: string }) => void }) {
-  const [mine, setMine] = useState<DealRow[] | null>(null);
-  const [top, setTop] = useState<DealRow[] | null>(null);
+/** Real deals: first on products you actually buy, then the best in the area. Filterable by store. */
+export function DealsView({
+  myCodes,
+  stores,
+  initialStore,
+  onAdd,
+}: {
+  myCodes: string[];
+  stores: Store[];
+  initialStore: string;
+  onAdd: (i: { code: string; name: string }) => void;
+}) {
+  const [store, setStore] = useState(initialStore); // "" = all stores
+  // The results are stored together with the key they were loaded for; a different key = still loading
+  const [data, setData] = useState<{
+    key: string;
+    mine: DealRow[];
+    top: DealRow[];
+  } | null>(null);
   const [now] = useState(() => Date.now());
   const codesKey = myCodes.join(",");
+  const loadKey = `${store}|${codesKey}`;
+  const ready = data?.key === loadKey;
+  const mine = ready ? data.mine : null;
+  const top = ready ? data.top : null;
 
   useEffect(() => {
     let cancelled = false;
     async function withNames(rows: DealRow[]): Promise<DealRow[]> {
       const codes = [...new Set(rows.map((r) => r.code))];
       if (codes.length === 0) return rows;
-      const { data } = await supabase.from("products").select("code,name,barcode").in("code", codes);
+      const { data } = await supabase
+        .from("products")
+        .select("code,name,barcode")
+        .in("code", codes);
       const m = new Map((data ?? []).map((p) => [p.code as string, p]));
-      return rows.map((r) => ({ ...r, name: m.get(r.code)?.name, barcode: m.get(r.code)?.barcode }));
+      return rows.map((r) => ({
+        ...r,
+        name: m.get(r.code)?.name,
+        barcode: m.get(r.code)?.barcode,
+      }));
     }
     (async () => {
-      const cols = "store_key,code,description,regular_price,promo_unit_price,min_qty,market_saving_pct,verdict,end_at";
+      const cols =
+        "store_key,code,description,regular_price,promo_unit_price,min_qty,market_saving_pct,verdict,end_at";
       const codes = codesKey ? codesKey.split(",") : [];
+      let mineQ = supabase
+        .from("deals")
+        .select(cols)
+        .in("code", codes)
+        .in("verdict", ["real", "conditional", "fake"]);
+      let topQ = supabase
+        .from("deals")
+        .select(cols)
+        .eq("verdict", "real")
+        .gte("market_saving_pct", 15)
+        .lte("market_saving_pct", 70);
+      if (store) {
+        mineQ = mineQ.eq("store_key", store);
+        topQ = topQ.eq("store_key", store);
+      }
       const [a, b] = await Promise.all([
-        codes.length
-          ? supabase.from("deals").select(cols).in("code", codes).in("verdict", ["real", "conditional", "fake"])
-          : Promise.resolve({ data: [] }),
-        supabase.from("deals").select(cols).eq("verdict", "real").gte("market_saving_pct", 15).lte("market_saving_pct", 70)
-          .order("market_saving_pct", { ascending: false }).limit(60),
+        codes.length ? mineQ : Promise.resolve({ data: [] }),
+        topQ.order("market_saving_pct", { ascending: false }).limit(60),
       ]);
-      const [m, t] = await Promise.all([withNames((a.data as DealRow[]) ?? []), withNames((b.data as DealRow[]) ?? [])]);
+      const [m, t] = await Promise.all([
+        withNames((a.data as DealRow[]) ?? []),
+        withNames((b.data as DealRow[]) ?? []),
+      ]);
       if (!cancelled) {
-        setMine(m.sort((x, y) => y.market_saving_pct - x.market_saving_pct));
-        setTop(t);
+        setData({
+          key: `${store}|${codesKey}`,
+          mine: m.sort((x, y) => y.market_saving_pct - x.market_saving_pct),
+          top: t,
+        });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [codesKey]);
+  }, [codesKey, store]);
+
+  const chips: [string, string][] = [
+    ["", "כל הסניפים"],
+    ...stores.map(
+      (s) => [s.store_key, storeShort(s.store_key, s.name)] as [string, string],
+    ),
+  ];
 
   return (
     <div className="space-y-6">
+      <div
+        className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
+        role="tablist"
+        aria-label="סינון לפי סופר"
+      >
+        {chips.map(([key, label]) => {
+          const active = store === key;
+          return (
+            <button
+              key={key || "all"}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setStore(key)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium shadow-card transition-colors ${
+                active
+                  ? "border-brand bg-brand text-brand-fg"
+                  : "border-line bg-surface text-fg"
+              }`}
+            >
+              {key && (
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: storeColor(key) }}
+                />
+              )}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       <section className="space-y-2">
         <h3 className="font-semibold">🎯 על מה שאתם קונים</h3>
         {mine == null ? (
           <p className="text-sm text-muted">טוען...</p>
         ) : mine.length === 0 ? (
           <p className="text-sm text-muted">
-            אין כרגע מבצעים על מוצרים מהרשימה ומהקניות הקודמות. ככל שתשתמשו יותר, הלשונית הזו תהיה חכמה יותר.
+            אין כרגע מבצעים על מוצרים מהרשימה ומהקניות הקודמות. ככל שתשתמשו
+            יותר, הלשונית הזו תהיה חכמה יותר.
           </p>
         ) : (
-          mine.map((d) => <DealCard key={d.store_key + d.code} d={d} now={now} onAdd={onAdd} />)
+          mine.map((d) => (
+            <DealCard
+              key={d.store_key + d.code}
+              d={d}
+              now={now}
+              onAdd={onAdd}
+            />
+          ))
         )}
       </section>
       <section className="space-y-2">
-        <h3 className="font-semibold">🔥 המבצעים האמיתיים הכי טובים באזור</h3>
+        <h3 className="font-semibold">
+          🔥 המבצעים האמיתיים הכי טובים{" "}
+          {store ? `ב${storeShort(store)}` : "באזור"}
+        </h3>
         <p className="text-xs text-muted">
-          רק מבצעים שנבדקו: זולים באמת מול שאר הסניפים, פתוחים לכולם, ולא &quot;קבועים&quot;.
+          רק מבצעים שנבדקו: זולים באמת מול שאר הסניפים, פתוחים לכולם, ולא
+          &quot;קבועים&quot;.
         </p>
-        {top == null ? <p className="text-sm text-muted">טוען...</p> : top.map((d) => <DealCard key={d.store_key + d.code} d={d} now={now} onAdd={onAdd} />)}
+        {top == null ? (
+          <p className="text-sm text-muted">טוען...</p>
+        ) : (
+          top.map((d) => (
+            <DealCard
+              key={d.store_key + d.code}
+              d={d}
+              now={now}
+              onAdd={onAdd}
+            />
+          ))
+        )}
       </section>
     </div>
   );
 }
 
-function DealCard({ d, now, onAdd }: { d: DealRow; now: number; onAdd: (i: { code: string; name: string }) => void }) {
+function DealCard({
+  d,
+  now,
+  onAdd,
+}: {
+  d: DealRow;
+  now: number;
+  onAdd: (i: { code: string; name: string }) => void;
+}) {
   const v = VERDICT[d.verdict] ?? VERDICT.meh;
   const end = d.end_at ? new Date(d.end_at) : null;
   const daysLeft = end ? Math.ceil((end.getTime() - now) / 86400000) : null;
@@ -92,14 +207,21 @@ function DealCard({ d, now, onAdd }: { d: DealRow; now: number; onAdd: (i: { cod
         <div className="truncate font-medium">{d.name ?? d.code}</div>
         <div className="truncate text-xs text-muted">{d.description}</div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`rounded px-1.5 py-0.5 font-semibold ${v.cls}`}>{v.label}</span>
+          <span className={`rounded px-1.5 py-0.5 font-semibold ${v.cls}`}>
+            {v.label}
+          </span>
           <span>{storeShort(d.store_key)}</span>
           <span>
-            <s className="text-faint">{ils(d.regular_price)}</s> <b>{ils(d.promo_unit_price)}</b>
+            <s className="text-faint">{ils(d.regular_price)}</s>{" "}
+            <b>{ils(d.promo_unit_price)}</b>
             {d.min_qty && d.min_qty > 1 ? ` (בקניית ${d.min_qty})` : ""}
           </span>
-          <span className="text-brand">−{Math.round(d.market_saving_pct)}% מול השוק</span>
-          {daysLeft != null && daysLeft <= 7 && daysLeft >= 0 && <span className="text-warn">נגמר בעוד {daysLeft} ימים</span>}
+          <span className="text-brand">
+            −{Math.round(d.market_saving_pct)}% מול השוק
+          </span>
+          {daysLeft != null && daysLeft <= 7 && daysLeft >= 0 && (
+            <span className="text-warn">נגמר בעוד {daysLeft} ימים</span>
+          )}
         </div>
       </div>
       <button
