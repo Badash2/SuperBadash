@@ -1,0 +1,12 @@
+{
+  "name": "superbadash-visual-check",
+  "private": true,
+  "description": "Visual check of the site on a phone screen, light/dark. See README.md",
+  "scripts": {
+    "light": "SCHEME=light node visual.cjs",
+    "dark": "SCHEME=dark node visual.cjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}
