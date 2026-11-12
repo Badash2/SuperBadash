@@ -89,11 +89,17 @@ Horizontal chip row: `no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4` (bleed
 - Mixed numbers and Hebrew: write `₪` through `ils()`; don't build price strings by hand.
 
 ## Interaction and accessibility
-- Tap target ≥ 40px (aim for 44). Icon-only buttons → `aria-label` in Hebrew.
+- Tap target ≥ 40px (aim for 44). Icon-only buttons → `aria-label` in Hebrew. A small icon (a 28px circle, ×) sits
+  inside a larger button with a negative margin (`-m-2 h-11 w-11`), so the layout doesn't grow and the tap target does.
+- Never `text-white`/`bg-white`: on `bg-brand` the text is `text-brand-fg` (in dark mode brand is light green and the text is dark).
 - Disabled state: `disabled:opacity-40`. Pressed state: `active:` (a phone has no hover).
 - Optimistic update first, then the request to Supabase.
 - Contrast: the tokens are tuned for AA. Don't put `text-faint` on `bg-surface-2` for important content.
-- Long product names (from the price files: abbreviated, sometimes 40+ characters): always `line-clamp-2` or `truncate`.
+- Long product names (from the price files: abbreviated, sometimes 40+ characters): always `line-clamp-2` or `truncate`,
+  and always through `displayName()` (`lib/text.ts`), which separates digits from Hebrew letters ("הומוגני3% 1.5ל" reads like "71.5" in RTL).
+- A number with a sign/percent inside Hebrew text: `<bdi dir="ltr">−37%</bdi>` - otherwise the minus moves to the other side.
+- Store colours (`storeColor`): a dot or a bar only. "Best/cheapest" is shown in `brand`, an incomplete basket in grey (`bg-faint/40`)
+  plus a `text-warn` label, so a partial basket doesn't look "cheap".
 
 ## UX copy
 Short, warm, family Hebrew. Address the family in the plural ("סמנו", "הוסיפו"). No technical jargon ("RLS", "sync").
@@ -102,7 +108,7 @@ Explain *why* when it isn't obvious (e.g. "מבצע קבוע = זה המחיר �
 ## Checklist before finishing UI work
 1. Guard against hard-coded colours/directions (should return nothing except Scanner.tsx):
    ```bash
-   grep -rnE "\b(slate|emerald|amber|rose|sky|gray|zinc|neutral|lime|green|red|blue)-[0-9]{2,3}|\bdark:|\b(ml|mr|pl|pr|left|right)-[0-9]|text-(left|right)" web/src --include=*.tsx --include=*.ts | grep -v Scanner.tsx
+   grep -rnE "\b(slate|emerald|amber|rose|sky|gray|zinc|neutral|lime|green|red|blue)-[0-9]{2,3}|\b(text|bg|border)-(white|black)\b|\bdark:|\b(ml|mr|pl|pr|left|right)-[0-9]|text-(left|right)" web/src --include=*.tsx --include=*.ts | grep -v Scanner.tsx
    ```
 2. `cd web && npm run lint && npm run build`.
 3. Visual check in **both** modes: `tools/visual-check/README.md` (`npm run light` / `npm run dark`), then **look** at the screenshots in `tools/visual-check/out/`:

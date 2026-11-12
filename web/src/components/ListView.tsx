@@ -1,11 +1,31 @@
 "use client";
-import type { ListItem, Member, PriceRow, ProductInfo, Store } from "@/lib/types";
-import { cheapest, effectivePrice, ils, isGoodDeal, type PriceMap } from "@/lib/pricing";
+import type {
+  ListItem,
+  Member,
+  PriceRow,
+  ProductInfo,
+  Store,
+} from "@/lib/types";
+import {
+  cheapest,
+  effectivePrice,
+  ils,
+  isGoodDeal,
+  type PriceMap,
+} from "@/lib/pricing";
 import { storeShort } from "@/lib/stores";
-import { classify, DEFAULT_ORDER, itemKey, SECTION_BY_ID, SECTIONS } from "@/lib/categories";
+import {
+  classify,
+  DEFAULT_ORDER,
+  itemKey,
+  SECTION_BY_ID,
+  SECTIONS,
+} from "@/lib/categories";
 import { AddBar, type AddFn } from "./AddBar";
 import { ProductImage } from "./ProductImage";
 import { NutritionChip } from "./NutritionChip";
+import { displayName } from "@/lib/text";
+import { useState } from "react";
 
 type Props = {
   items: ListItem[];
@@ -27,14 +47,34 @@ type Props = {
 };
 
 export function ListView(p: Props) {
+  // A tip shown once per device (localStorage = a personal convenience; works without it too)
+  const [tipSeen, setTipSeen] = useState(() => {
+    try {
+      return localStorage.getItem("aisleTipSeen") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissTip = () => {
+    setTipSeen(true);
+    try {
+      localStorage.setItem("aisleTipSeen", "1");
+    } catch {}
+  };
   const who = (email: string) => {
-    const m = p.members.find((x) => x.email.toLowerCase() === email.toLowerCase());
+    const m = p.members.find(
+      (x) => x.email.toLowerCase() === email.toLowerCase(),
+    );
     return m?.display_name || email.split("@")[0];
   };
-  const sectionOf = (i: ListItem) => p.overrides.get(itemKey(i)) ?? classify(i.name);
+  const sectionOf = (i: ListItem) =>
+    p.overrides.get(itemKey(i)) ?? classify(i.name);
   const open = p.items.filter((i) => !i.checked);
-  const done = p.items.filter((i) => i.checked).sort((a, b) => (a.checked_at ?? "").localeCompare(b.checked_at ?? ""));
-  const pos = (i: ListItem) => (p.currentStore ? p.aisle.get(itemKey(i)) : undefined);
+  const done = p.items
+    .filter((i) => i.checked)
+    .sort((a, b) => (a.checked_at ?? "").localeCompare(b.checked_at ?? ""));
+  const pos = (i: ListItem) =>
+    p.currentStore ? p.aisle.get(itemKey(i)) : undefined;
 
   // Group by section. In-store mode: sections ordered by the route learned in this branch
   const groups = new Map<string, ListItem[]>();
@@ -44,12 +84,21 @@ export function ListView(p: Props) {
     groups.get(s)!.push(it);
   }
   const sectionRank = (id: string) => {
-    const learned = (groups.get(id) ?? []).map(pos).filter((x): x is number => x != null);
-    return learned.length ? Math.min(...learned) * 100 : 1000 + (DEFAULT_ORDER.get(id) ?? 99);
+    const learned = (groups.get(id) ?? [])
+      .map(pos)
+      .filter((x): x is number => x != null);
+    return learned.length
+      ? Math.min(...learned) * 100
+      : 1000 + (DEFAULT_ORDER.get(id) ?? 99);
   };
-  const ordered = [...groups.entries()].sort(([a], [b]) => sectionRank(a) - sectionRank(b));
+  const ordered = [...groups.entries()].sort(
+    ([a], [b]) => sectionRank(a) - sectionRank(b),
+  );
   for (const [, list] of ordered) {
-    list.sort((a, b) => (pos(a) ?? 2) - (pos(b) ?? 2) || a.added_at.localeCompare(b.added_at));
+    list.sort(
+      (a, b) =>
+        (pos(a) ?? 2) - (pos(b) ?? 2) || a.added_at.localeCompare(b.added_at),
+    );
   }
 
   return (
@@ -71,10 +120,19 @@ export function ListView(p: Props) {
           ))}
         </select>
       </label>
-      {p.currentStore && p.aisle.size === 0 && open.length > 0 && (
-        <p className="rounded-2xl bg-info-soft p-3 text-sm text-info">
-          סמנו ✓ לפי הסדר שבו אתם אוספים. אחרי קנייה או שתיים המחלקות יסתדרו לפי המסלול שלכם בסניף הזה.
-        </p>
+      {p.currentStore && p.aisle.size === 0 && open.length > 0 && !tipSeen && (
+        <div className="flex items-start gap-2 rounded-2xl bg-info-soft p-3 text-sm text-info">
+          <p className="flex-1">
+            סמנו ✓ לפי סדר האיסוף. המחלקות יסתדרו לפי המסלול שלכם.
+          </p>
+          <button
+            onClick={dismissTip}
+            className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center text-lg"
+            aria-label="סגור"
+          >
+            ×
+          </button>
+        </div>
       )}
 
       {open.length === 0 && done.length === 0 && (
@@ -91,7 +149,9 @@ export function ListView(p: Props) {
             <h3 className="flex items-center gap-2 px-1 text-sm font-bold text-muted">
               <span className="text-base">{sec.emoji}</span>
               {sec.label}
-              <span className="rounded-full bg-surface-2 px-2 text-xs font-semibold">{list.length}</span>
+              <span className="rounded-full bg-surface-2 px-2 text-xs font-semibold">
+                {list.length}
+              </span>
             </h3>
             <ul className="space-y-2">
               {list.map((it) => (
@@ -105,7 +165,9 @@ export function ListView(p: Props) {
       {done.length > 0 && (
         <section className="space-y-2 border-t border-line pt-4">
           <div className="flex items-center justify-between">
-            <h3 className="px-1 text-sm font-bold text-muted">🛒 בעגלה ({done.length})</h3>
+            <h3 className="px-1 text-sm font-bold text-muted">
+              🛒 בעגלה ({done.length})
+            </h3>
             <button
               onClick={p.onFinish}
               className="rounded-2xl bg-brand px-4 py-2 text-sm font-bold text-brand-fg shadow-card active:bg-brand-strong"
@@ -115,7 +177,13 @@ export function ListView(p: Props) {
           </div>
           <ul className="space-y-2 opacity-60">
             {done.map((it) => (
-              <Row key={it.id} it={it} section={sectionOf(it)} {...p} who={who} />
+              <Row
+                key={it.id}
+                it={it}
+                section={sectionOf(it)}
+                {...p}
+                who={who}
+              />
             ))}
           </ul>
         </section>
@@ -125,12 +193,31 @@ export function ListView(p: Props) {
 }
 
 function Row({
-  it, section, prices, infos, currentStore, onToggle, onQty, onDelete, onSetCategory, who,
+  it,
+  section,
+  prices,
+  infos,
+  currentStore,
+  onToggle,
+  onQty,
+  onDelete,
+  onSetCategory,
+  who,
 }: Props & { it: ListItem; section: string; who: (e: string) => string }) {
   const byStore = it.code ? prices.get(it.code) : undefined;
   const best = cheapest(byStore, it.quantity);
-  const here: PriceRow | undefined = currentStore ? byStore?.get(currentStore) : undefined;
+  const here: PriceRow | undefined = currentStore
+    ? byStore?.get(currentStore)
+    : undefined;
   const deals = byStore ? [...byStore.values()].filter(isGoodDeal) : [];
+  const dealsHere = currentStore
+    ? deals.filter((d) => d.store_key === currentStore)
+    : deals;
+  const dealsElsewhere = currentStore
+    ? deals.filter((d) => d.store_key !== currentStore)
+    : [];
+  const hereIsBest =
+    !!here && !!best && effectivePrice(here, it.quantity) <= best.price + 0.001;
   const info = it.code ? infos.get(it.code) : undefined;
 
   return (
@@ -138,38 +225,81 @@ function Row({
       <button
         onClick={() => onToggle(it)}
         aria-label={it.checked ? "בטל סימון" : "סמן כנלקח"}
-        className={`mt-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors ${
-          it.checked ? "border-brand bg-brand text-brand-fg" : "border-faint/60 hover:border-brand"
-        }`}
+        className="-m-2 mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center"
       >
-        {it.checked ? "✓" : ""}
+        <span
+          className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors ${
+            it.checked
+              ? "border-brand bg-brand text-brand-fg"
+              : "border-faint/60"
+          }`}
+        >
+          {it.checked ? "✓" : ""}
+        </span>
       </button>
-      <ProductImage code={it.code} fallbackUrl={info?.image_url} size={48} emoji={SECTION_BY_ID.get(section)?.emoji} />
+      <ProductImage
+        code={it.code}
+        fallbackUrl={info?.image_url}
+        size={48}
+        emoji={SECTION_BY_ID.get(section)?.emoji}
+      />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-start gap-2">
-          <div className={`line-clamp-2 flex-1 font-semibold leading-snug text-fg ${it.checked ? "line-through" : ""}`}>{it.name}</div>
-          <button onClick={() => onDelete(it)} className="-mt-0.5 shrink-0 px-1 text-lg leading-none text-faint hover:text-danger" aria-label="מחק">
+          <div
+            className={`line-clamp-2 flex-1 font-semibold leading-snug text-fg ${it.checked ? "line-through" : ""}`}
+          >
+            {displayName(it.name)}
+          </div>
+          <button
+            onClick={() => onDelete(it)}
+            className="-me-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center text-xl leading-none text-faint active:text-danger"
+            aria-label="מחק"
+          >
             ×
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          {here && <span className="font-bold text-fg">כאן {ils(effectivePrice(here, it.quantity))}</span>}
-          {best && (!here || best.store !== currentStore) && (
+          {here && (
+            <span className="font-bold text-fg">
+              כאן{" "}
+              <span className={hereIsBest ? "text-brand" : ""}>
+                {ils(effectivePrice(here, it.quantity))}
+              </span>
+              {hereIsBest && <span className="ms-1 text-brand">✓ הכי זול</span>}
+            </span>
+          )}
+          {best && !hereIsBest && (
             <span className="whitespace-nowrap">
-              הכי זול <b className="text-brand">{ils(best.price)}</b> ב{storeShort(best.store)}
+              {currentStore ? "זול יותר" : "הכי זול"}{" "}
+              <b className={currentStore ? "text-fg" : "text-brand"}>
+                {ils(best.price)}
+              </b>{" "}
+              ב{storeShort(best.store)}
             </span>
           )}
           {it.code && !byStore && <span>אין מחיר כרגע</span>}
-          {deals.length > 0 && (
+          {dealsHere.length > 0 && (
             <span className="rounded-full bg-accent-soft px-2 py-0.5 font-bold text-accent">
-              🔥 מבצע ב{deals.map((d) => storeShort(d.store_key)).join(", ")}
+              🔥{" "}
+              {currentStore
+                ? "במבצע כאן"
+                : `מבצע ב${dealsHere.map((d) => storeShort(d.store_key)).join(", ")}`}
+            </span>
+          )}
+          {currentStore && dealsElsewhere.length > 0 && (
+            <span>
+              מבצע ב
+              {dealsElsewhere.map((d) => storeShort(d.store_key)).join(", ")}
             </span>
           )}
         </div>
         <NutritionChip info={info} />
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex min-w-0 items-center gap-2 text-[11px] text-faint">
-            <label className="relative flex items-center gap-0.5 rounded-full bg-surface-2 px-2 py-0.5 text-muted" title="שינוי מחלקה">
+            <label
+              className="relative flex min-h-8 items-center gap-0.5 rounded-full bg-surface-2 px-2.5 py-1.5 text-muted"
+              title="שינוי מחלקה"
+            >
               {SECTION_BY_ID.get(section)?.emoji ?? "📦"} ▾
               <select
                 value={section}
@@ -184,14 +314,26 @@ function Row({
                 ))}
               </select>
             </label>
-            <span className="truncate">{who(it.checked && it.checked_by ? it.checked_by : it.added_by)}</span>
+            <span className="truncate">
+              {who(it.checked && it.checked_by ? it.checked_by : it.added_by)}
+            </span>
           </div>
           <div className="flex shrink-0 items-center rounded-xl bg-surface-2">
-            <button onClick={() => onQty(it, -1)} className="h-8 w-8 rounded-xl text-lg text-fg" aria-label="פחות">
+            <button
+              onClick={() => onQty(it, -1)}
+              className="h-10 w-10 rounded-xl text-lg text-fg"
+              aria-label="פחות"
+            >
               −
             </button>
-            <span className="w-6 text-center text-sm font-bold tabular-nums text-fg">{it.quantity}</span>
-            <button onClick={() => onQty(it, 1)} className="h-8 w-8 rounded-xl text-lg text-fg" aria-label="עוד">
+            <span className="w-6 text-center text-sm font-bold tabular-nums text-fg">
+              {it.quantity}
+            </span>
+            <button
+              onClick={() => onQty(it, 1)}
+              className="h-10 w-10 rounded-xl text-lg text-fg"
+              aria-label="עוד"
+            >
               +
             </button>
           </div>

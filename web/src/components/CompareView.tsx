@@ -7,7 +7,15 @@ const SPLIT_WORTH_IT = 25; // ₪ - below this, a second stop isn't worth it
 
 type StoreTotal = { store: string; total: number; missing: ListItem[] };
 
-export function CompareView({ items, prices, stores }: { items: ListItem[]; prices: PriceMap; stores: Store[] }) {
+export function CompareView({
+  items,
+  prices,
+  stores,
+}: {
+  items: ListItem[];
+  prices: PriceMap;
+  stores: Store[];
+}) {
   const open = items.filter((i) => !i.checked);
   const priced = open.filter((i) => i.code && prices.has(i.code));
   const unpriced = open.filter((i) => !i.code || !prices.has(i.code));
@@ -15,7 +23,7 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
   if (priced.length === 0) {
     return (
       <div className="py-12 text-center text-muted">
-        כדי להשוות, הוסיפו לרשימה מוצרים מתוך החיפוש (לא טקסט חופשי).
+        כדי להשוות, הוסיפו לרשימה מוצרים מתוך החיפוש או בסריקה.
       </div>
     );
   }
@@ -42,7 +50,12 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
   const bestSingle = totals[0];
 
   // The best split across two stores (each item at the cheaper of the two)
-  let bestPair: { a: string; b: string; total: number; assign: Map<string, string> } | null = null;
+  let bestPair: {
+    a: string;
+    b: string;
+    total: number;
+    assign: Map<string, string>;
+  } | null = null;
   for (let i = 0; i < keys.length; i++) {
     for (let j = i + 1; j < keys.length; j++) {
       let total = 0;
@@ -64,7 +77,8 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
         }
       }
       if (missing > bestSingle.missing.length) continue;
-      if (!bestPair || total < bestPair.total) bestPair = { a: keys[i], b: keys[j], total, assign };
+      if (!bestPair || total < bestPair.total)
+        bestPair = { a: keys[i], b: keys[j], total, assign };
     }
   }
   const pairSaving = bestPair ? bestSingle.total - bestPair.total : 0;
@@ -78,36 +92,56 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
           {storeShort(bestSingle.store)} · {ils(bestSingle.total)}
         </div>
         {bestSingle.missing.length > 0 && (
-          <div className="text-xs text-warn">חסרים שם: {bestSingle.missing.map((m) => m.name).join(", ")}</div>
+          <div className="text-xs text-warn">
+            חסרים שם: {bestSingle.missing.map((m) => m.name).join(", ")}
+          </div>
         )}
         {bestPair && pairSaving >= SPLIT_WORTH_IT && (
           <div className="mt-2 text-sm">
-            💡 חלוקה בין <b>{storeShort(bestPair.a)}</b> ל<b>{storeShort(bestPair.b)}</b> חוסכת עוד{" "}
-            <b>{ils(pairSaving)}</b> (ראו פירוט למטה)
+            💡 חלוקה בין <b>{storeShort(bestPair.a)}</b> ל
+            <b>{storeShort(bestPair.b)}</b> חוסכת עוד <b>{ils(pairSaving)}</b>{" "}
+            (ראו פירוט למטה)
           </div>
         )}
         {bestPair && pairSaving > 0 && pairSaving < SPLIT_WORTH_IT && (
           <div className="mt-1 text-xs text-muted">
-            חלוקה לשני סופרים הייתה חוסכת רק {ils(pairSaving)}, לא שווה נסיעה נוספת.
+            חלוקה לשני סופרים הייתה חוסכת רק {ils(pairSaving)}, לא שווה נסיעה
+            נוספת.
           </div>
         )}
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted">כל הסניפים ({priced.length} מוצרים)</h3>
+        <h3 className="text-sm font-semibold text-muted">
+          כל הסניפים ({priced.length} מוצרים)
+        </h3>
         {totals.map((t) => (
           <div key={t.store} className="space-y-1">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">{storeShort(t.store)}</span>
+              <span className="flex items-center gap-2 font-medium">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: storeColor(t.store) }}
+                />
+                {storeShort(t.store)}
+              </span>
               <span className="tabular-nums">
-                {ils(t.total)}
-                {t.missing.length > 0 && <span className="text-xs text-warn"> (חסרים {t.missing.length})</span>}
+                {t.missing.length > 0 ? (
+                  <span className="text-xs text-warn">
+                    {ils(t.total)} · בלי {t.missing.length} מוצרים
+                  </span>
+                ) : (
+                  ils(t.total)
+                )}
               </span>
             </div>
             <div className="h-2 rounded-full bg-surface-2">
+              {/* An incomplete basket isn't comparable - a grey bar so it doesn't look "cheap" */}
               <div
-                className="h-2 rounded-full"
-                style={{ width: `${maxTotal ? (t.total / maxTotal) * 100 : 0}%`, background: storeColor(t.store) }}
+                className={`h-2 rounded-full ${t.missing.length > 0 ? "bg-faint/40" : t.store === bestSingle.store ? "bg-brand" : "bg-muted/50"}`}
+                style={{
+                  width: `${maxTotal ? (t.total / maxTotal) * 100 : 0}%`,
+                }}
               />
             </div>
           </div>
@@ -118,8 +152,15 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-muted">חלוקה מומלצת</h3>
           {[bestPair.a, bestPair.b].map((s) => (
-            <div key={s} className="rounded-xl border border-line p-3">
-              <div className="mb-1 font-semibold" style={{ color: storeColor(s) }}>
+            <div
+              key={s}
+              className="rounded-2xl border border-line bg-surface p-3 shadow-card"
+            >
+              <div className="mb-1 flex items-center gap-2 font-semibold text-fg">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: storeColor(s) }}
+                />
                 {storeShort(s)}
               </div>
               <ul className="text-sm text-muted">
@@ -136,7 +177,8 @@ export function CompareView({ items, prices, stores }: { items: ListItem[]; pric
 
       {unpriced.length > 0 && (
         <p className="text-xs text-muted">
-          לא נכללו בהשוואה (טקסט חופשי או בלי מחיר): {unpriced.map((u) => u.name).join(", ")}
+          לא נכללו בהשוואה (מוצרים בלי ברקוד או בלי מחיר):{" "}
+          {unpriced.map((u) => u.name).join(", ")}
         </p>
       )}
     </div>

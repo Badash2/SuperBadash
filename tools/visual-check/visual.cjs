@@ -157,7 +157,7 @@ const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
   await page.getByRole("button", { name: "+ בננות" }).click();
   await page.waitForTimeout(300);
   await input.fill("גלידה וניל");
-  await page.getByRole("button", { name: "הוסף", exact: true }).click();
+  await page.getByRole("button", { name: "הוסיפו", exact: true }).click();
   await page.waitForTimeout(500);
 
   // Barcode scan (fake camera with a Bamba EAN-13)

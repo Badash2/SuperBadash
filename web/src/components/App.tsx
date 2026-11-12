@@ -429,14 +429,12 @@ function Main({ session }: { session: Session }) {
   const onSetCategory = async (it: ListItem, category: string) => {
     const key = itemKey(it);
     setOverrides((prev) => new Map(prev).set(key, category));
-    await supabase
-      .from("item_categories")
-      .upsert({
-        item_key: key,
-        category,
-        set_by: me,
-        set_at: new Date().toISOString(),
-      });
+    await supabase.from("item_categories").upsert({
+      item_key: key,
+      category,
+      set_by: me,
+      set_at: new Date().toISOString(),
+    });
   };
   const onFinish = async () => {
     const done = items
@@ -513,11 +511,13 @@ function Main({ session }: { session: Session }) {
           </div>
         </div>
         <button
-          onClick={() => supabase.auth.signOut()}
-          className="shrink-0 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted"
-          title={me}
+          onClick={() => {
+            if (confirm(`להתנתק מ-${me}?`)) supabase.auth.signOut();
+          }}
+          className="flex min-h-10 shrink-0 items-center rounded-full bg-surface-2 px-3 text-xs font-medium text-muted"
+          title={`${me} - לחיצה להתנתקות`}
         >
-          {(session.user.user_metadata?.full_name ?? me).split(" ")[0]} · יציאה
+          {(session.user.user_metadata?.full_name ?? me).split(" ")[0]}
         </button>
       </header>
 
@@ -548,7 +548,12 @@ function Main({ session }: { session: Session }) {
           <CompareView items={items} prices={prices} stores={stores} />
         )}
         {tab === "deals" && (
-          <DealsView myCodes={myCodes} stores={stores} initialStore={currentStore} onAdd={(i) => onAdd(i)} />
+          <DealsView
+            myCodes={myCodes}
+            stores={stores}
+            initialStore={currentStore}
+            onAdd={(i) => onAdd(i)}
+          />
         )}
       </main>
 

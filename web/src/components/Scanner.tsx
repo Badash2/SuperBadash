@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-type Detector = { detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
+type Detector = {
+  detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
+};
 type Mode = "list" | "cart";
 
 const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
@@ -41,7 +43,11 @@ export function Scanner({
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         const v = videoRef.current!;
@@ -49,12 +55,18 @@ export function Scanner({
         await v.play();
 
         let detector: Detector;
-        const Native = (globalThis as unknown as { BarcodeDetector?: new (o: object) => Detector }).BarcodeDetector;
+        const Native = (
+          globalThis as unknown as {
+            BarcodeDetector?: new (o: object) => Detector;
+          }
+        ).BarcodeDetector;
         if (Native) {
           detector = new Native({ formats: FORMATS });
         } else {
           const { BarcodeDetector } = await import("barcode-detector/ponyfill");
-          detector = new BarcodeDetector({ formats: FORMATS as never }) as unknown as Detector;
+          detector = new BarcodeDetector({
+            formats: FORMATS as never,
+          }) as unknown as Detector;
         }
         setStatus("כוונו את הברקוד למסגרת");
 
@@ -63,7 +75,9 @@ export function Scanner({
           if (!busy && v.readyState >= 2) {
             try {
               const found = await detector.detect(v);
-              const code = found.map((f) => f.rawValue).find((c) => /^\d{8,14}$/.test(c));
+              const code = found
+                .map((f) => f.rawValue)
+                .find((c) => /^\d{8,14}$/.test(c));
               const now = Date.now();
               if (code && now - (recent.get(code) ?? 0) > 2500) {
                 recent.set(code, now);
@@ -118,13 +132,21 @@ export function Scanner({
             </button>
           ))}
         </div>
-        <button onClick={onClose} className="rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black">
+        <button
+          onClick={onClose}
+          className="rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black"
+        >
           סיום
         </button>
       </div>
 
       <div className="relative flex-1 overflow-hidden">
-        <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          className="absolute inset-0 h-full w-full object-cover"
+        />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-40 w-72 rounded-2xl border-4 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
         </div>

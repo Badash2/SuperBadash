@@ -15,14 +15,19 @@ export function ProductImage({
   emoji?: string;
 }) {
   const sources = [
-    code && /^\d{8,14}$/.test(code) ? `https://img.rami-levy.co.il/product/${code}/small.jpg` : null,
+    code && /^\d{8,14}$/.test(code)
+      ? `https://img.rami-levy.co.il/product/${code}/small.jpg`
+      : null,
     fallbackUrl ?? null,
   ].filter(Boolean) as string[];
   const [idx, setIdx] = useState(0);
   const style = { width: size, height: size };
   if (idx >= sources.length) {
     return (
-      <div style={style} className="flex shrink-0 items-center justify-center rounded-xl bg-surface-2 text-xl">
+      <div
+        style={style}
+        className="flex shrink-0 items-center justify-center rounded-xl bg-surface-2 text-xl"
+      >
         {emoji}
       </div>
     );

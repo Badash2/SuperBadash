@@ -5,6 +5,7 @@ import { ils, VERDICT } from "@/lib/pricing";
 import { storeColor, storeShort } from "@/lib/stores";
 import type { Store } from "@/lib/types";
 import { ProductImage } from "./ProductImage";
+import { displayName } from "@/lib/text";
 
 type DealRow = {
   store_key: string;
@@ -148,8 +149,7 @@ export function DealsView({
           <p className="text-sm text-muted">טוען...</p>
         ) : mine.length === 0 ? (
           <p className="text-sm text-muted">
-            אין כרגע מבצעים על מוצרים מהרשימה ומהקניות הקודמות. ככל שתשתמשו
-            יותר, הלשונית הזו תהיה חכמה יותר.
+            עוד אין מבצעים על מה שאתם קונים{store ? " בסניף הזה" : ""}.
           </p>
         ) : (
           mine.map((d) => (
@@ -157,6 +157,7 @@ export function DealsView({
               key={d.store_key + d.code}
               d={d}
               now={now}
+              showStore={!store}
               onAdd={onAdd}
             />
           ))
@@ -179,6 +180,7 @@ export function DealsView({
               key={d.store_key + d.code}
               d={d}
               now={now}
+              showStore={!store}
               onAdd={onAdd}
             />
           ))
@@ -191,33 +193,41 @@ export function DealsView({
 function DealCard({
   d,
   now,
+  showStore,
   onAdd,
 }: {
   d: DealRow;
   now: number;
+  showStore: boolean;
   onAdd: (i: { code: string; name: string }) => void;
 }) {
   const v = VERDICT[d.verdict] ?? VERDICT.meh;
   const end = d.end_at ? new Date(d.end_at) : null;
   const daysLeft = end ? Math.ceil((end.getTime() - now) / 86400000) : null;
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2">
-      <ProductImage code={d.barcode ?? null} size={44} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">{d.name ?? d.code}</div>
-        <div className="truncate text-xs text-muted">{d.description}</div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`rounded px-1.5 py-0.5 font-semibold ${v.cls}`}>
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
+      <ProductImage code={d.barcode ?? null} size={48} />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="line-clamp-2 font-semibold leading-snug text-fg">
+          {displayName(d.name ?? d.code)}
+        </div>
+        <div className="line-clamp-2 text-xs text-muted">
+          {displayName(d.description ?? "")}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className={`rounded-full px-2 py-0.5 font-bold ${v.cls}`}>
             {v.label}
           </span>
-          <span>{storeShort(d.store_key)}</span>
+          {showStore && (
+            <span className="text-muted">{storeShort(d.store_key)}</span>
+          )}
           <span>
             <s className="text-faint">{ils(d.regular_price)}</s>{" "}
             <b>{ils(d.promo_unit_price)}</b>
             {d.min_qty && d.min_qty > 1 ? ` (בקניית ${d.min_qty})` : ""}
           </span>
           <span className="text-brand">
-            −{Math.round(d.market_saving_pct)}% מול השוק
+            <bdi dir="ltr">−{Math.round(d.market_saving_pct)}%</bdi> מול השוק
           </span>
           {daysLeft != null && daysLeft <= 7 && daysLeft >= 0 && (
             <span className="text-warn">נגמר בעוד {daysLeft} ימים</span>
@@ -226,7 +236,7 @@ function DealCard({
       </div>
       <button
         onClick={() => onAdd({ code: d.code, name: d.name ?? d.code })}
-        className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-sm font-semibold text-white"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand text-xl font-bold text-brand-fg shadow-card active:bg-brand-strong"
         aria-label="הוסף לרשימה"
       >
         +
