@@ -169,13 +169,31 @@ async function simulateHistory(code) {
     await page.waitForTimeout(350);
   }
   await page.getByText("ירקות ופירות בלחיצה").click();
-  await page.getByRole("button", { name: "+ עגבניות" }).click();
+  await page.getByRole("button", { name: "🍅 עגבניות" }).click();
   await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "+ בננות" }).click();
+  await page.getByRole("button", { name: "🍌 בננות" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "🥬 חסה" }).click();
   await page.waitForTimeout(300);
   await input.fill("גלידה וניל");
   await page.getByRole("button", { name: "הוסיפו", exact: true }).click();
   await page.waitForTimeout(500);
+
+  // Units: tomatoes start in kg, + adds half a kilo, tap = switch to units; lettuce = units; a packaged product = units, not switchable
+  await page.waitForTimeout(600);
+  const tomRow = page.locator("li", { hasText: "עגבניות" }).first();
+  await tomRow.getByRole("button", { name: "עוד" }).click();
+  await page.waitForTimeout(500);
+  const unitsA = (await db.query("select name, quantity::text q, unit from shopping_items order by added_at")).rows;
+  await page.screenshot({ path: P("2a-units"), fullPage: true });
+  await tomRow.getByRole("button", { name: /כמות .*להחלפה/ }).click();
+  await page.waitForTimeout(500);
+  const tomAfter = (await db.query("select quantity::text q, unit from shopping_items where name='עגבניות'")).rows[0];
+  const packagedSwitchable = await page.locator("li", { hasText: "נייר טואלט" }).first().getByRole("button", { name: /להחלפה/ }).count();
+  console.log("units:", unitsA.filter((r) => /עגבניות|בננות|חסה|נייר/.test(r.name)).map((r) => `${r.name}=${r.q} ${r.unit}`).join(" | "),
+    "| tomatoes after switch:", JSON.stringify(tomAfter), "| packaged switchable:", packagedSwitchable);
+  await tomRow.getByRole("button", { name: /כמות .*להחלפה/ }).click(); // back to kg for the rest of the test
+  await page.waitForTimeout(300);
 
   // Barcode scan (fake camera with a Bamba EAN-13)
   await page.getByRole("button", { name: "סריקת ברקוד" }).click();

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-notify-rules.mts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-history.mts"
+    "test": "for f in scripts/test-*.mts; do node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON $f || exit 1; done"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

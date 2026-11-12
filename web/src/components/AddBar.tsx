@@ -5,6 +5,7 @@ import type { SearchResult } from "@/lib/types";
 import { ProductImage } from "./ProductImage";
 import { ils } from "@/lib/pricing";
 import { displayName } from "@/lib/text";
+import { itemEmoji } from "@/lib/produce";
 
 // Produce has no barcode - quick add with one tap
 const QUICK_PRODUCE = [
@@ -29,6 +30,7 @@ const QUICK_PRODUCE = [
 export type AddFn = (item: {
   code: string | null;
   name: string;
+  weighted?: boolean; // a weighed product from the price files -> starts in kg
 }) => Promise<void>;
 
 /** Add to the list: search, barcode scan, or quick produce. */
@@ -64,8 +66,8 @@ export function AddBar({
     return () => clearTimeout(t);
   }, [q]);
 
-  async function add(code: string | null, name: string) {
-    await onAdd({ code, name });
+  async function add(code: string | null, name: string, weighted = false) {
+    await onAdd({ code, name, weighted });
     setQ("");
     setResults([]);
     setOpen(false);
@@ -132,7 +134,7 @@ export function AddBar({
             {results.map((r) => (
               <button
                 key={r.code}
-                onClick={() => add(r.code, r.name)}
+                onClick={() => add(r.code, r.name, r.is_weighted)}
                 className="flex w-full items-center gap-3 border-b border-line p-2.5 text-start last:border-0 hover:bg-surface-2"
               >
                 <ProductImage code={r.barcode} size={40} />
@@ -178,7 +180,7 @@ export function AddBar({
                 onClick={() => onAdd({ code: null, name: p })}
                 className="shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-fg shadow-card active:bg-brand-soft"
               >
-                + {p}
+                {itemEmoji(p)} {p}
               </button>
             ))}
           </div>

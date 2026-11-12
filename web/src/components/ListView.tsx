@@ -25,6 +25,7 @@ import { AddBar, type AddFn } from "./AddBar";
 import { ProductImage } from "./ProductImage";
 import { NutritionChip } from "./NutritionChip";
 import { displayName } from "@/lib/text";
+import { formatQty, itemEmoji, UNIT_LABEL } from "@/lib/produce";
 import { useState } from "react";
 
 type Props = {
@@ -41,6 +42,7 @@ type Props = {
   onScan: () => void;
   onToggle: (item: ListItem) => void;
   onQty: (item: ListItem, delta: number) => void;
+  onUnit: (item: ListItem) => void;
   onDelete: (item: ListItem) => void;
   onSetCategory: (item: ListItem, category: string) => void;
   onFinish: () => void;
@@ -196,6 +198,7 @@ export function ListView(p: Props) {
 function Row({
   it,
   section,
+  onUnit,
   onOpenProduct,
   prices,
   infos,
@@ -221,6 +224,9 @@ function Row({
   const hereIsBest =
     !!here && !!best && effectivePrice(here, it.quantity) <= best.price + 0.001;
   const info = it.code ? infos.get(it.code) : undefined;
+  const unit = it.unit ?? "units";
+  // A packaged product (with a barcode) is always units; free text or a weighed product (internal code) can be switched
+  const canSwitch = !it.code || it.code.includes(":") || unit === "kg";
 
   return (
     <li className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
@@ -249,7 +255,7 @@ function Row({
           code={it.code}
           fallbackUrl={info?.image_url}
           size={48}
-          emoji={SECTION_BY_ID.get(section)?.emoji}
+          emoji={itemEmoji(it.name) ?? SECTION_BY_ID.get(section)?.emoji}
         />
       </button>
       <div className="min-w-0 flex-1 space-y-1">
@@ -337,9 +343,25 @@ function Row({
             >
               −
             </button>
-            <span className="w-6 text-center text-sm font-bold tabular-nums text-fg">
-              {it.quantity}
-            </span>
+            {/* The quantity with its unit, always visible; tap = switch units/kg (not on a packaged product) */}
+            <button
+              onClick={() => canSwitch && onUnit(it)}
+              disabled={!canSwitch}
+              aria-label={`כמות ${formatQty(Number(it.quantity), unit)}${canSwitch ? ", לחצו להחלפה בין יחידות לקילו" : ""}`}
+              className={`flex min-h-10 min-w-16 flex-col items-center justify-center px-1 leading-none ${canSwitch ? "" : "cursor-default"}`}
+            >
+              <span className="text-sm font-bold tabular-nums text-fg">
+                {unit === "kg"
+                  ? String(Math.round(Number(it.quantity) * 10) / 10)
+                  : Math.round(Number(it.quantity))}
+              </span>
+              <span
+                className={`mt-0.5 text-[11px] font-semibold ${canSwitch ? "text-brand underline decoration-dotted underline-offset-2" : "text-muted"}`}
+              >
+                {UNIT_LABEL[unit]}
+                {canSwitch ? " ⇄" : ""}
+              </span>
+            </button>
             <button
               onClick={() => onQty(it, 1)}
               className="h-10 w-10 rounded-xl text-lg text-fg"

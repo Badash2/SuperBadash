@@ -5,6 +5,7 @@ export type ListItem = {
   code: string | null;
   name: string;
   quantity: number;
+  unit: "units" | "kg";
   note: string | null;
   added_by: string;
   added_at: string;

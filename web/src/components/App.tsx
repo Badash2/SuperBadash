@@ -6,6 +6,7 @@ import { RanOutView, type ConsumedRow } from "./RanOutView";
 import { SettingsView } from "./SettingsView";
 import { ProductSheet } from "./ProductSheet";
 import { notifyEvent } from "@/lib/push";
+import { defaultUnit, stepQty, switchUnit, type Unit } from "@/lib/produce";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -256,6 +257,7 @@ function Main({ session }: { session: Session }) {
         (data as ListItem[]).map((i) => ({
           ...i,
           quantity: Number(i.quantity) || 1,
+          unit: i.unit ?? "units",
         })),
       );
   }, []);
@@ -410,12 +412,24 @@ function Main({ session }: { session: Session }) {
         })
         .then(() => {});
   };
+  // Quantity by unit: units step 1, kg step half a kilo
   const onQty = async (it: ListItem, delta: number) => {
-    const quantity = Math.max(1, Number(it.quantity) + delta);
+    const quantity = stepQty(
+      Number(it.quantity),
+      it.unit ?? "units",
+      delta > 0 ? 1 : -1,
+    );
     setItems((prev) =>
       prev.map((x) => (x.id === it.id ? { ...x, quantity } : x)),
     );
     await supabase.from("shopping_items").update({ quantity }).eq("id", it.id);
+  };
+  const onUnit = async (it: ListItem) => {
+    const patch = switchUnit(Number(it.quantity), it.unit ?? "units");
+    setItems((prev) =>
+      prev.map((x) => (x.id === it.id ? { ...x, ...patch } : x)),
+    );
+    await supabase.from("shopping_items").update(patch).eq("id", it.id);
   };
   const onDelete = async (it: ListItem) => {
     setItems((prev) => prev.filter((x) => x.id !== it.id));
@@ -425,10 +439,12 @@ function Main({ session }: { session: Session }) {
     code,
     name,
     toCart = false,
+    weighted = false,
   }: {
     code: string | null;
     name: string;
     toCart?: boolean;
+    weighted?: boolean;
   }) => {
     const existing = items.find(
       (i) => !i.checked && (code ? i.code === code : i.name === name),
@@ -449,7 +465,12 @@ function Main({ session }: { session: Session }) {
       : {};
     const { data } = await supabase
       .from("shopping_items")
-      .insert({ code, name, ...cart })
+      .insert({
+        code,
+        name,
+        unit: defaultUnit(name, { code, weighted }) satisfies Unit,
+        ...cart,
+      })
       .select()
       .single();
     if (data && !toCart) notifyEvent("list_add", (data as ListItem).id);
@@ -459,6 +480,7 @@ function Main({ session }: { session: Session }) {
         {
           ...(data as ListItem),
           quantity: Number((data as ListItem).quantity) || 1,
+          unit: (data as ListItem).unit ?? "units",
         },
       ]);
   };
@@ -551,6 +573,7 @@ function Main({ session }: { session: Session }) {
         code: it.code,
         name: it.name,
         quantity: it.quantity,
+        unit: it.unit ?? "units",
         store_key: it.checked_store,
         seq: i,
         purchased_at: it.checked_at,
@@ -646,6 +669,7 @@ function Main({ session }: { session: Session }) {
               onAdd,
               onToggle,
               onQty,
+              onUnit,
               onDelete,
               onSetCategory,
               onFinish,
