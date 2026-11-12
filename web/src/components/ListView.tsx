@@ -44,6 +44,7 @@ type Props = {
   onDelete: (item: ListItem) => void;
   onSetCategory: (item: ListItem, category: string) => void;
   onFinish: () => void;
+  onOpenProduct: (code: string) => void;
 };
 
 export function ListView(p: Props) {
@@ -195,6 +196,7 @@ export function ListView(p: Props) {
 function Row({
   it,
   section,
+  onOpenProduct,
   prices,
   infos,
   currentStore,
@@ -237,19 +239,28 @@ function Row({
           {it.checked ? "✓" : ""}
         </span>
       </button>
-      <ProductImage
-        code={it.code}
-        fallbackUrl={info?.image_url}
-        size={48}
-        emoji={SECTION_BY_ID.get(section)?.emoji}
-      />
+      <button
+        onClick={() => it.code && onOpenProduct(it.code)}
+        disabled={!it.code}
+        aria-label={it.code ? `כרטיס מוצר: ${it.name}` : undefined}
+        className="shrink-0"
+      >
+        <ProductImage
+          code={it.code}
+          fallbackUrl={info?.image_url}
+          size={48}
+          emoji={SECTION_BY_ID.get(section)?.emoji}
+        />
+      </button>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-start gap-2">
-          <div
-            className={`line-clamp-2 flex-1 font-semibold leading-snug text-fg ${it.checked ? "line-through" : ""}`}
+          <button
+            onClick={() => it.code && onOpenProduct(it.code)}
+            disabled={!it.code}
+            className={`line-clamp-2 flex-1 text-start font-semibold leading-snug text-fg ${it.checked ? "line-through" : ""}`}
           >
             {displayName(it.name)}
-          </div>
+          </button>
           <button
             onClick={() => onDelete(it)}
             className="-me-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center text-xl leading-none text-faint active:text-danger"

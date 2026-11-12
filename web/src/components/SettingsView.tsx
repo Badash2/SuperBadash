@@ -229,7 +229,11 @@ export function SettingsView({
             ["off", "בלי"],
           ]}
         />
-        {prefs.deals !== "off" && <div className="border-t border-line pt-3 text-sm text-muted">על אילו מוצרים:</div>}
+        {prefs.deals !== "off" && (
+          <div className="border-t border-line pt-3 text-sm text-muted">
+            על אילו מוצרים:
+          </div>
+        )}
         {prefs.deals !== "off" && (
           <Radio<Prefs["deals_scope"]>
             value={prefs.deals_scope}

@@ -4,6 +4,7 @@ import { Scanner } from "./Scanner";
 import { isKioskDevice } from "./Kiosk";
 import { RanOutView, type ConsumedRow } from "./RanOutView";
 import { SettingsView } from "./SettingsView";
+import { ProductSheet } from "./ProductSheet";
 import { notifyEvent } from "@/lib/push";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
@@ -210,6 +211,7 @@ function Main({ session }: { session: Session }) {
   const [ranOutRows, setRanOutRows] = useState<ConsumedRow[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [scanning, setScanning] = useState(false);
+  const [openCode, setOpenCode] = useState<string | null>(null);
   const [currentStore, setCurrentStoreState] = useState(() => {
     try {
       return localStorage.getItem("currentStore") ?? "";
@@ -648,6 +650,7 @@ function Main({ session }: { session: Session }) {
               onSetCategory,
               onFinish,
             }}
+            onOpenProduct={setOpenCode}
             onScan={() => setScanning(true)}
           />
         )}
@@ -673,6 +676,7 @@ function Main({ session }: { session: Session }) {
             now={now}
             onAdd={onRanOutAdd}
             onHide={onRanOutHide}
+            onOpen={setOpenCode}
           />
         )}
         {tab === "compare" && (
@@ -684,9 +688,20 @@ function Main({ session }: { session: Session }) {
             stores={stores}
             initialStore={currentStore}
             onAdd={(i) => onAdd(i)}
+            onOpen={setOpenCode}
           />
         )}
       </main>
+
+      {openCode && (
+        <ProductSheet
+          key={openCode}
+          code={openCode}
+          onClose={() => setOpenCode(null)}
+          onOpen={setOpenCode}
+          onAdd={(i) => onAdd(i)}
+        />
+      )}
 
       {scanning && (
         <Scanner

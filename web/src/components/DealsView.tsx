@@ -7,6 +7,16 @@ import type { Store } from "@/lib/types";
 import { ProductImage } from "./ProductImage";
 import { displayName } from "@/lib/text";
 
+type PriceMove = {
+  code: string;
+  store_key: string;
+  old: number;
+  now: number;
+  pct: number;
+  name?: string;
+  barcode?: string | null;
+};
+
 type DealRow = {
   store_key: string;
   code: string;
@@ -27,11 +37,13 @@ export function DealsView({
   stores,
   initialStore,
   onAdd,
+  onOpen,
 }: {
   myCodes: string[];
   stores: Store[];
   initialStore: string;
   onAdd: (i: { code: string; name: string }) => void;
+  onOpen: (code: string) => void;
 }) {
   const [store, setStore] = useState(initialStore); // "" = all stores
   // The results are stored together with the key they were loaded for; a different key = still loading
@@ -41,6 +53,11 @@ export function DealsView({
     top: DealRow[];
   } | null>(null);
   const [now] = useState(() => Date.now());
+  // "Price changes for you": real changes in the last 7 days on products you buy (up and down)
+  const [changes, setChanges] = useState<{
+    key: string;
+    rows: PriceMove[];
+  } | null>(null);
   const codesKey = myCodes.join(",");
   const loadKey = `${store}|${codesKey}`;
   const ready = data?.key === loadKey;
@@ -110,6 +127,70 @@ export function DealsView({
     ),
   ];
 
+  useEffect(() => {
+    const codes = codesKey ? codesKey.split(",") : [];
+    if (!codes.length) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc("recent_changes", {
+        codes,
+        p_days: 7,
+      });
+      const raw =
+        (data as {
+          code: string;
+          store_key: string;
+          changed_at: string;
+          old_price: number;
+          new_price: number;
+        }[]) ?? [];
+      // The latest change per product and store; the strongest first
+      const latest = new Map<string, PriceMove>();
+      for (const r of raw) {
+        const k = `${r.code}|${r.store_key}`;
+        if (!latest.has(k))
+          latest.set(k, {
+            code: r.code,
+            store_key: r.store_key,
+            old: r.old_price,
+            now: r.new_price,
+            pct: r.new_price / r.old_price - 1,
+          });
+      }
+      let moves = [...latest.values()].filter((m) => Math.abs(m.pct) >= 0.02);
+      if (store) moves = moves.filter((m) => m.store_key === store);
+      moves = moves
+        .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
+        .slice(0, 8);
+      const ids = [...new Set(moves.map((m) => m.code))];
+      if (ids.length) {
+        const { data: p } = await supabase
+          .from("products")
+          .select("code,name,barcode")
+          .in("code", ids);
+        const m = new Map(
+          (
+            (p ?? []) as {
+              code: string;
+              name: string;
+              barcode: string | null;
+            }[]
+          ).map((x) => [x.code, x]),
+        );
+        moves = moves.map((x) => ({
+          ...x,
+          name: m.get(x.code)?.name,
+          barcode: m.get(x.code)?.barcode,
+        }));
+      }
+      if (!cancelled) setChanges({ key: `${store}|${codesKey}`, rows: moves });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [codesKey, store]);
+  const moves = changes?.key === `${store}|${codesKey}` ? changes.rows : [];
+
   return (
     <div className="space-y-6">
       <div
@@ -143,6 +224,38 @@ export function DealsView({
         })}
       </div>
 
+      {moves.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">📈 שינויי מחיר אצלכם השבוע</h3>
+          <ul className="divide-y divide-line rounded-2xl border border-line bg-surface px-3 shadow-card">
+            {moves.map((m) => (
+              <li key={m.code + m.store_key}>
+                <button
+                  onClick={() => onOpen(m.code)}
+                  className="flex min-h-12 w-full items-center gap-3 py-2 text-start"
+                >
+                  <span
+                    className={`w-12 shrink-0 text-sm font-bold ${m.pct > 0 ? "text-warn" : "text-brand"}`}
+                  >
+                    {m.pct > 0 ? "▲" : "▼"}
+                    <bdi dir="ltr">{Math.round(Math.abs(m.pct) * 100)}%</bdi>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-fg">
+                      {displayName(m.name ?? m.code)}
+                    </span>
+                    <span className="block text-xs text-muted">
+                      {storeShort(m.store_key)} · <s>{ils(m.old)}</s> ←{" "}
+                      {ils(m.now)}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="space-y-2">
         <h3 className="font-semibold">🎯 על מה שאתם קונים</h3>
         {mine == null ? (
@@ -158,6 +271,7 @@ export function DealsView({
               d={d}
               now={now}
               showStore={!store}
+              onOpen={onOpen}
               onAdd={onAdd}
             />
           ))
@@ -181,6 +295,7 @@ export function DealsView({
               d={d}
               now={now}
               showStore={!store}
+              onOpen={onOpen}
               onAdd={onAdd}
             />
           ))
@@ -195,10 +310,12 @@ function DealCard({
   now,
   showStore,
   onAdd,
+  onOpen,
 }: {
   d: DealRow;
   now: number;
   showStore: boolean;
+  onOpen: (code: string) => void;
   onAdd: (i: { code: string; name: string }) => void;
 }) {
   const v = VERDICT[d.verdict] ?? VERDICT.meh;
@@ -206,11 +323,20 @@ function DealCard({
   const daysLeft = end ? Math.ceil((end.getTime() - now) / 86400000) : null;
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
-      <ProductImage code={d.barcode ?? null} size={48} />
+      <button
+        onClick={() => onOpen(d.code)}
+        className="shrink-0"
+        aria-label={`כרטיס מוצר: ${d.name ?? d.code}`}
+      >
+        <ProductImage code={d.barcode ?? null} size={48} />
+      </button>
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="line-clamp-2 font-semibold leading-snug text-fg">
+        <button
+          onClick={() => onOpen(d.code)}
+          className="line-clamp-2 text-start font-semibold leading-snug text-fg"
+        >
           {displayName(d.name ?? d.code)}
-        </div>
+        </button>
         <div className="line-clamp-2 text-xs text-muted">
           {displayName(d.description ?? "")}
         </div>

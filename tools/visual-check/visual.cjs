@@ -125,7 +125,19 @@ function fakeSession() {
 
 const SCHEME = process.env.SCHEME || "light";
 const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
+async function simulateHistory(code) {
+  // Simulated history (local test DB only!): went up at Rami Levy, went down at Shufersal Deal - so the chart, insights and feed have movement
+  const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 19);
+  const cur = Object.fromEntries((await db.query("select store_key, price from current_prices where code=$1", [code])).rows.map((r) => [r.store_key, r.price]));
+  for (const [store, price] of Object.entries(cur)) {
+    const start = store === "rami-levy-yahalom" ? +(price * 0.88).toFixed(2) : store === "shufersal-deal-hakadar" ? +(price * 1.06).toFixed(2) : price;
+    await db.query("insert into price_changes (store_key, code, changed_at, old_price, new_price) values ($1,$2,$3,null,$4) on conflict do nothing", [store, code, d(80), start]);
+    if (start !== price) await db.query("insert into price_changes (store_key, code, changed_at, old_price, new_price) values ($1,$2,$3,$4,$5) on conflict do nothing", [store, code, d(store === "rami-levy-yahalom" ? 3 : 25), start, price]);
+  }
+}
+
 (async () => {
+  await db.query("delete from price_changes where changed_at < '2026-11-11'");
   await db.query("truncate shopping_items, purchases, item_categories, notification_prefs");
   const browser = await chromium.launch({
     args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${OUT}/barcode.y4m`],
@@ -201,6 +213,33 @@ const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
   await page.waitForTimeout(2500);
   const allStores = await page.locator("section").last().locator("div.flex.flex-wrap.items-center span:nth-child(2)").allInnerTexts();
   console.log("deals filter: initial chip =", initialSel, "| rami-levy cards:", cardStores.length, "distinct:", [...new Set(cardStores)], "| db real deals at rami levy:", dbCount, "| all-stores distinct:", [...new Set(allStores)]);
+
+  // Product card: open, highlight a store, range, touch the chart, alternatives
+  const cottage = (await db.query("select code, name from shopping_items where name like 'קוטג%' limit 1")).rows[0];
+  await simulateHistory(cottage.code);
+  await page.locator("nav button").first().click();
+  await page.getByRole("button", { name: /קוטג/ }).first().click();
+  await page.getByText("הכי זול עכשיו").waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  await page.getByRole("tab", { name: "3 חודשים" }).click();
+  await page.waitForTimeout(500);
+  const box = await page.locator("svg[role=img]").boundingBox();
+  if (box) await page.mouse.move(box.x + box.width * 0.35, box.y + box.height / 2);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: P("8-product"), fullPage: true });
+  const sheet = {
+    insights: await page.locator("[role=dialog] section ul.space-y-1 li").allInnerTexts(),
+    alternatives: await page.getByText("חלופות זולות יותר").count(),
+    tooltip: await page.locator("div[dir=rtl].pointer-events-none").count(),
+  };
+  console.log("product sheet:", JSON.stringify(sheet).slice(0, 400));
+  await page.getByRole("button", { name: "חזרה" }).click();
+  await page.locator("nav button").nth(3).click();
+  await page.getByRole("tab", { name: "כל הסניפים" }).click(); // the tab opens filtered to the current store
+  await page.getByText("שינויי מחיר אצלכם השבוע").waitFor({ timeout: 10000 });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: P("9-price-moves") });
+  console.log("price moves:", (await page.locator("ul.divide-y li").first().innerText()).replace(/\s+/g, " "));
 
   // Settings: changing preferences is saved for the user
   await page.getByRole("button", { name: "הגדרות" }).click();

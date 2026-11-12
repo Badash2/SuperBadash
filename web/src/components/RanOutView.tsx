@@ -36,12 +36,14 @@ export function RanOutView({
   now,
   onAdd,
   onHide,
+  onOpen,
 }: {
   rows: ConsumedRow[];
   onList: Set<string>;
   now: number;
   onAdd: (g: { code: string; name: string }) => void;
   onHide: (code: string) => void;
+  onOpen: (code: string) => void;
 }) {
   const groups = new Map<string, Group>();
   for (const r of rows) {
@@ -88,7 +90,7 @@ export function RanOutView({
           </h3>
           <ul className="space-y-2">
             {fresh.map((g) => (
-              <Row key={g.code} g={g} now={now}>
+              <Row key={g.code} g={g} now={now} onOpen={onOpen}>
                 <button
                   onClick={() => onHide(g.code)}
                   className="flex h-10 w-10 shrink-0 items-center justify-center text-xl text-faint"
@@ -114,7 +116,7 @@ export function RanOutView({
           <h3 className="px-1 text-sm font-bold text-muted">טופל</h3>
           <ul className="space-y-2 opacity-70">
             {handled.map((g) => (
-              <Row key={g.code} g={g} now={now}>
+              <Row key={g.code} g={g} now={now} onOpen={onOpen}>
                 {onList.has(g.code) ? (
                   <span className="shrink-0 text-xs font-semibold text-brand">
                     ✓ ברשימה
@@ -139,19 +141,30 @@ export function RanOutView({
 function Row({
   g,
   now,
+  onOpen,
   children,
 }: {
+  onOpen: (code: string) => void;
   g: Group;
   now: number;
   children: React.ReactNode;
 }) {
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
-      <ProductImage code={g.code} size={44} />
+      <button
+        onClick={() => onOpen(g.code)}
+        className="shrink-0"
+        aria-label={`כרטיס מוצר: ${g.name}`}
+      >
+        <ProductImage code={g.code} size={44} />
+      </button>
       <div className="min-w-0 flex-1">
-        <div className="line-clamp-2 font-semibold leading-snug text-fg">
+        <button
+          onClick={() => onOpen(g.code)}
+          className="line-clamp-2 text-start font-semibold leading-snug text-fg"
+        >
           {displayName(g.name)}
-        </div>
+        </button>
         <div className="text-xs text-muted">
           נגמר {ago(g.last, now)}
           {g.count > 1 ? ` · ${g.count} פעמים ב-30 יום` : ""}
