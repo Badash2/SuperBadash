@@ -39,7 +39,8 @@ Defined as CSS variables with a light/dark pair, exposed to Tailwind through `@t
 Allowed exceptions (fixed colours by meaning, not by theme):
 - The official Nutri-Score colours in `NutritionChip.tsx`.
 - Store identity colours in `lib/stores.ts` (dot / chart bar only, never as text on a background).
-- The scanner screen (`Scanner.tsx`): a camera UI that is always black, in either mode.
+- The camera screens (`Scanner.tsx`, `Kiosk.tsx` = the fixed scanner by the bin): a camera UI that is always dark, in either mode
+  (explicit `[#hex]` values only, so the guard stays strict).
 
 Deal verdict → badge (`lib/pricing.ts` `VERDICT`): real=accent, conditional=warn, permanent=surface-2/muted, meh=info, fake=danger.
 
@@ -108,7 +109,7 @@ Explain *why* when it isn't obvious (e.g. "מבצע קבוע = זה המחיר �
 ## Checklist before finishing UI work
 1. Guard against hard-coded colours/directions (should return nothing except Scanner.tsx):
    ```bash
-   grep -rnE "\b(slate|emerald|amber|rose|sky|gray|zinc|neutral|lime|green|red|blue)-[0-9]{2,3}|\b(text|bg|border)-(white|black)\b|\bdark:|\b(ml|mr|pl|pr|left|right)-[0-9]|text-(left|right)" web/src --include=*.tsx --include=*.ts | grep -v Scanner.tsx
+   grep -rnE "\b(slate|emerald|amber|rose|sky|gray|zinc|neutral|lime|green|red|blue)-[0-9]{2,3}|\b(text|bg|border)-(white|black)\b|\bdark:|\b(ml|mr|pl|pr|left|right)-[0-9]|text-(left|right)" web/src --include=*.tsx --include=*.ts | grep -v -E "Scanner.tsx|Kiosk.tsx"
    ```
 2. `cd web && npm run lint && npm run build`.
 3. Visual check in **both** modes: `tools/visual-check/README.md` (`npm run light` / `npm run dark`), then **look** at the screenshots in `tools/visual-check/out/`:

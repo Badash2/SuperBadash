@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "./Scanner";
+import { isKioskDevice } from "./Kiosk";
+import type { RanOut } from "./ListView";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -23,6 +25,16 @@ type Gate = "loading" | "signed-out" | "not-family" | "ok";
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [gate, setGate] = useState<Gate>("loading");
+
+  // A device marked as the fixed scanner (by the bin) always opens on the scanner screen
+  useEffect(() => {
+    if (
+      isKioskDevice() &&
+      !new URLSearchParams(window.location.search).has("app")
+    ) {
+      window.location.replace("/scanner");
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -186,6 +198,9 @@ function Main({ session }: { session: Session }) {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   // Main is rendered only on the client (after login), so localStorage can be read in the initialiser
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
+  const [ranOutRows, setRanOutRows] = useState<
+    { id: string; code: string; name: string; scanned_at: string }[]
+  >([]);
   const [scanning, setScanning] = useState(false);
   const [currentStore, setCurrentStoreState] = useState(() => {
     try {
@@ -200,6 +215,25 @@ function Main({ session }: { session: Session }) {
       localStorage.setItem("currentStore", s);
     } catch {}
   };
+
+  const loadRanOut = useCallback(async () => {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data } = await supabase
+      .from("consumed_items")
+      .select("id,code,name,scanned_at")
+      .eq("status", "new")
+      .gte("scanned_at", since)
+      .order("scanned_at", { ascending: false });
+    if (data)
+      setRanOutRows(
+        data as {
+          id: string;
+          code: string;
+          name: string;
+          scanned_at: string;
+        }[],
+      );
+  }, []);
 
   const loadItems = useCallback(async () => {
     const { data } = await supabase
@@ -259,7 +293,7 @@ function Main({ session }: { session: Session }) {
         .map((r) => r.prices_at)
         .sort();
       setUpdatedAt(times.at(-1) ?? null);
-      await loadItems();
+      await Promise.all([loadItems(), loadRanOut()]);
     })();
     const ch = supabase
       .channel("shopping_items")
@@ -268,14 +302,22 @@ function Main({ session }: { session: Session }) {
         { event: "*", schema: "public", table: "shopping_items" },
         () => loadItems(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "consumed_items" },
+        () => loadRanOut(),
+      )
       .subscribe();
-    const onFocus = () => loadItems();
+    const onFocus = () => {
+      loadItems();
+      loadRanOut();
+    };
     window.addEventListener("focus", onFocus);
     return () => {
       supabase.removeChannel(ch);
       window.removeEventListener("focus", onFocus);
     };
-  }, [loadItems]);
+  }, [loadItems, loadRanOut]);
 
   // Prices and nutrition for the codes on the list
   const codesKey = useMemo(
@@ -436,6 +478,41 @@ function Main({ session }: { session: Session }) {
       set_at: new Date().toISOString(),
     });
   };
+  // "Ran out" from the scanner by the bin: grouped by product (the same milk scanned 3 times = one item)
+  const ranOut: RanOut[] = useMemo(() => {
+    const onList = new Set(
+      items.filter((i) => !i.checked && i.code).map((i) => i.code),
+    );
+    const m = new Map<string, RanOut>();
+    for (const r of ranOutRows) {
+      if (onList.has(r.code)) continue;
+      const g = m.get(r.code);
+      if (g) g.count++;
+      else
+        m.set(r.code, {
+          code: r.code,
+          name: r.name,
+          count: 1,
+          last: r.scanned_at,
+        });
+    }
+    return [...m.values()];
+  }, [ranOutRows, items]);
+
+  const markRanOut = async (code: string, status: "added" | "dismissed") => {
+    setRanOutRows((prev) => prev.filter((r) => r.code !== code));
+    await supabase
+      .from("consumed_items")
+      .update({ status, handled_at: new Date().toISOString() })
+      .eq("code", code)
+      .eq("status", "new");
+  };
+  const onRanOutAdd = async (r: RanOut) => {
+    await onAdd({ code: r.code, name: r.name });
+    await markRanOut(r.code, "added");
+  };
+  const onRanOutDismiss = (r: RanOut) => markRanOut(r.code, "dismissed");
+
   const onFinish = async () => {
     const done = items
       .filter((i) => i.checked)
@@ -534,6 +611,9 @@ function Main({ session }: { session: Session }) {
               setCurrentStore,
               aisle,
               overrides,
+              ranOut,
+              onRanOutAdd,
+              onRanOutDismiss,
               onAdd,
               onToggle,
               onQty,
