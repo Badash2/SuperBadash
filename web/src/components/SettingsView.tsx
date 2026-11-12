@@ -10,6 +10,7 @@ import {
   type PushState,
 } from "@/lib/push";
 import type { Member } from "@/lib/types";
+import { DEFAULT_HEALTH, type HealthPrefs } from "@/lib/health";
 
 type Opt<T extends string> = [T, string, string?];
 
@@ -24,6 +25,7 @@ export function SettingsView({
   onRenamed: (name: string) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
+  const [health, setHealth] = useState<HealthPrefs>(DEFAULT_HEALTH);
   const [push, setPush] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -40,7 +42,27 @@ export function SettingsView({
         setPrefs((data as Prefs | null) ?? { email: me, ...DEFAULT_PREFS }),
       );
     pushState().then(setPush);
+    supabase
+      .from("health_prefs")
+      .select("*")
+      .ilike("email", me)
+      .maybeSingle()
+      .then(
+        ({ data }) =>
+          data &&
+          setHealth({ ...DEFAULT_HEALTH, ...(data as Partial<HealthPrefs>) }),
+      );
   }, [me]);
+
+  const saveHealth = async (patch: Partial<HealthPrefs>) => {
+    const next = { ...health, ...patch };
+    setHealth(next);
+    const { error } = await supabase
+      .from("health_prefs")
+      .upsert({ email: me, ...next, updated_at: new Date().toISOString() });
+    setNote(error ? "השמירה נכשלה: " + error.message : "נשמר ✓");
+    setTimeout(() => setNote(null), 1500);
+  };
 
   const save = async (patch: Partial<Prefs>) => {
     const next = { ...prefs!, ...patch, email: me };
@@ -250,6 +272,49 @@ export function SettingsView({
         )}
       </Card>
 
+      <Card title="🍎 בריאות - הספים שלי">
+        <p className="text-xs text-muted">
+          משמשים לסימונים בכרטיס המוצר. כל אחד מכייל לעצמו.
+        </p>
+        <NumberRow
+          label="קלורי מדי מעל"
+          unit="קל׳ ל-100 גרם"
+          value={health.kcal_high}
+          min={100}
+          max={900}
+          step={25}
+          onChange={(v) => saveHealth({ kcal_high: v })}
+        />
+        <NumberRow
+          label="מוצר חלבוני מ-"
+          unit="ג׳ חלבון ל-100 קל׳"
+          value={health.protein_good}
+          min={3}
+          max={30}
+          step={1}
+          onChange={(v) => saveHealth({ protein_good: v })}
+        />
+        <NumberRow
+          label="מעובד מאוד מעל"
+          unit="רכיבים"
+          value={health.processed_max_ingr}
+          min={3}
+          max={25}
+          step={1}
+          onChange={(v) => saveHealth({ processed_max_ingr: v })}
+        />
+        <Toggle
+          label="תוספים (מספרי E, מייצבים, צבעי מאכל) = מעובד מאוד"
+          checked={health.flag_additives}
+          onChange={(v) => saveHealth({ flag_additives: v })}
+        />
+        <Toggle
+          label="להציג סימון אדום של משרד הבריאות"
+          checked={health.red_labels}
+          onChange={(v) => saveHealth({ red_labels: v })}
+        />
+      </Card>
+
       <Card title="⏰ זמנים">
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>שעת הסיכום היומי</span>
@@ -372,5 +437,73 @@ function Chip({
     >
       {children}
     </button>
+  );
+}
+
+function NumberRow({
+  label,
+  unit,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  const set = (v: number) =>
+    onChange(Math.min(max, Math.max(min, Math.round(v / step) * step)));
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-fg">{label}</span>
+      <span className="flex items-center gap-1">
+        <button
+          onClick={() => set(value - step)}
+          className="h-10 w-10 rounded-xl bg-surface-2 text-lg text-fg"
+          aria-label={`פחות - ${label}`}
+        >
+          −
+        </button>
+        <span className="min-w-14 text-center">
+          <span className="block font-bold tabular-nums text-fg">{value}</span>
+          <span className="block text-[10px] text-muted">{unit}</span>
+        </span>
+        <button
+          onClick={() => set(value + step)}
+          className="h-10 w-10 rounded-xl bg-surface-2 text-lg text-fg"
+          aria-label={`עוד - ${label}`}
+        >
+          +
+        </button>
+      </span>
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-10 items-center justify-between gap-3 text-sm">
+      <span className="text-fg">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-5 w-5 accent-[var(--brand)]"
+      />
+    </label>
   );
 }

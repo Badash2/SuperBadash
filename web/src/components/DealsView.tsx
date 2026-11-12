@@ -46,6 +46,45 @@ export function DealsView({
   onOpen: (code: string) => void;
 }) {
   const [store, setStore] = useState(initialStore); // "" = all stores
+  // View: list or gallery (large images). Remembered on the device.
+  const [view, setViewState] = useState<"list" | "grid">(() => {
+    try {
+      return localStorage.getItem("dealsView") === "grid" ? "grid" : "list";
+    } catch {
+      return "list";
+    }
+  });
+  const renderDeals = (rows: DealRow[]) =>
+    view === "grid" ? (
+      <div className="grid grid-cols-2 gap-3">
+        {rows.map((d) => (
+          <DealTile
+            key={d.store_key + d.code}
+            d={d}
+            showStore={!store}
+            onOpen={onOpen}
+            onAdd={onAdd}
+          />
+        ))}
+      </div>
+    ) : (
+      rows.map((d) => (
+        <DealCard
+          key={d.store_key + d.code}
+          d={d}
+          now={now}
+          showStore={!store}
+          onOpen={onOpen}
+          onAdd={onAdd}
+        />
+      ))
+    );
+  const setView = (v: "list" | "grid") => {
+    setViewState(v);
+    try {
+      localStorage.setItem("dealsView", v);
+    } catch {}
+  };
   // The results are stored together with the key they were loaded for; a different key = still loading
   const [data, setData] = useState<{
     key: string;
@@ -193,6 +232,33 @@ export function DealsView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted">תצוגה</span>
+        <div
+          className="flex shrink-0 rounded-full bg-surface-2 p-1"
+          role="tablist"
+          aria-label="תצוגה"
+        >
+          {(
+            [
+              ["list", "☰", "רשימה"],
+              ["grid", "▦", "גלריה"],
+            ] as const
+          ).map(([v, icon, label]) => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              aria-label={label}
+              title={label}
+              onClick={() => setView(v)}
+              className={`flex h-9 w-10 items-center justify-center rounded-full text-base ${view === v ? "bg-surface text-fg shadow-card" : "text-muted"}`}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
       <div
         className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
         role="tablist"
@@ -265,16 +331,7 @@ export function DealsView({
             עוד אין מבצעים על מה שאתם קונים{store ? " בסניף הזה" : ""}.
           </p>
         ) : (
-          mine.map((d) => (
-            <DealCard
-              key={d.store_key + d.code}
-              d={d}
-              now={now}
-              showStore={!store}
-              onOpen={onOpen}
-              onAdd={onAdd}
-            />
-          ))
+          renderDeals(mine)
         )}
       </section>
       <section className="space-y-2">
@@ -289,16 +346,7 @@ export function DealsView({
         {top == null ? (
           <p className="text-sm text-muted">טוען...</p>
         ) : (
-          top.map((d) => (
-            <DealCard
-              key={d.store_key + d.code}
-              d={d}
-              now={now}
-              showStore={!store}
-              onOpen={onOpen}
-              onAdd={onAdd}
-            />
-          ))
+          renderDeals(top)
         )}
       </section>
     </div>
@@ -366,6 +414,86 @@ function DealCard({
         aria-label="הוסף לרשימה"
       >
         +
+      </button>
+    </div>
+  );
+}
+
+/** A large image: Rami Levy's image server at high resolution (1024px), otherwise an icon. */
+function BigImage({ code, alt }: { code: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!code || !/^\d{8,14}$/.test(code) || failed)
+    return (
+      <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-surface-2 text-5xl">
+        🛒
+      </div>
+    );
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- an external CDN
+    <img
+      src={`https://img.rami-levy.co.il/product/${code}/medium.jpg`}
+      srcSet={`https://img.rami-levy.co.il/product/${code}/medium.jpg 1x, https://img.rami-levy.co.il/product/${code}/large.jpg 2x`}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="aspect-square w-full rounded-xl bg-img object-contain p-2"
+    />
+  );
+}
+
+/** Gallery card: a large image on top, name, price, verdict, and an add button. */
+function DealTile({
+  d,
+  showStore,
+  onOpen,
+  onAdd,
+}: {
+  d: DealRow;
+  showStore: boolean;
+  onOpen: (code: string) => void;
+  onAdd: (i: { code: string; name: string }) => void;
+}) {
+  const v = VERDICT[d.verdict] ?? VERDICT.meh;
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-card">
+      <button
+        onClick={() => onOpen(d.code)}
+        className="relative"
+        aria-label={`כרטיס מוצר: ${d.name ?? d.code}`}
+      >
+        <BigImage code={d.barcode ?? null} alt={d.name ?? ""} />
+        <span
+          className={`absolute end-1.5 top-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${v.cls}`}
+        >
+          <bdi dir="ltr">−{Math.round(d.market_saving_pct)}%</bdi>
+        </span>
+      </button>
+      <button
+        onClick={() => onOpen(d.code)}
+        className="line-clamp-2 min-h-10 text-start text-sm font-semibold leading-snug text-fg"
+      >
+        {displayName(d.name ?? d.code)}
+      </button>
+      <div className="flex flex-wrap items-baseline gap-x-1.5 text-sm">
+        <b className="text-fg">{ils(d.promo_unit_price)}</b>
+        <s className="text-xs text-faint">{ils(d.regular_price)}</s>
+        {d.min_qty && d.min_qty > 1 ? (
+          <span className="text-[11px] text-muted">(בקניית {d.min_qty})</span>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span className={`rounded-full px-2 py-0.5 font-bold ${v.cls}`}>
+          {v.label}
+        </span>
+        {showStore && (
+          <span className="text-muted">{storeShort(d.store_key)}</span>
+        )}
+      </div>
+      <button
+        onClick={() => onAdd({ code: d.code, name: d.name ?? d.code })}
+        className="mt-auto h-10 rounded-xl bg-brand text-sm font-bold text-brand-fg active:bg-brand-strong"
+      >
+        + לרשימה
       </button>
     </div>
   );

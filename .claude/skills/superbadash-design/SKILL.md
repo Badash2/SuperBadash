@@ -38,6 +38,7 @@ Defined as CSS variables with a light/dark pair, exposed to Tailwind through `@t
 
 Allowed exceptions (fixed colours by meaning, not by theme):
 - The official Nutri-Score colours in `NutritionChip.tsx`.
+- The Ministry of Health red label in `ProductHealth.tsx` (`bg-[#d32f2f]` with white text): a regulated label that keeps its colour in both modes.
 - Store identity colours in `lib/stores.ts` (dot / chart bar only, never as text on a background).
 - The camera screens (`Scanner.tsx`, `Kiosk.tsx` = the fixed scanner by the bin): a camera UI that is always dark, in either mode
   (explicit `[#hex]` values only, so the guard stays strict).

@@ -51,6 +51,16 @@ export type ProductInfo = {
   sat_fat_100g: number | null;
   sodium_100g: number | null;
   nutriscore: string | null;
+  // v2: ingredients and processing (Open Food Facts), carbohydrates, fibre, back-of-pack images
+  carbs_100g?: number | null;
+  fiber_100g?: number | null;
+  ingredients_text?: string | null;
+  ingredients_n?: number | null;
+  additives?: string[] | null;
+  nova?: number | null;
+  image_ingredients_url?: string | null;
+  image_nutrition_url?: string | null;
+  v?: number;
 };
 
 export type Member = { email: string; display_name: string | null };

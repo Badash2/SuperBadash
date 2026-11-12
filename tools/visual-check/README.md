@@ -35,3 +35,12 @@ node notify-api.cjs            # 9 checks: security, who gets what, duplicates, 
 ```
 `NODE_TLS_REJECT_UNAUTHORIZED=0` is for the local test only (a self-signed certificate for the fake push service). Never in production.
 After the test, rebuild normally (without `NEXT_PUBLIC_SUPABASE_URL`) before the visual check.
+
+## The research round (product info + reviews)
+`tools/research/research.py` + `tools/research/PLAYBOOK.md`. A local test against the fake Supabase:
+```bash
+node mock-supabase.cjs &
+SUPABASE_URL=http://localhost:54321 python3 ../research/research.py pending --out /tmp/research
+# ... results.json ...
+SUPABASE_URL=http://localhost:54321 python3 ../research/research.py save /tmp/research/results.json
+```

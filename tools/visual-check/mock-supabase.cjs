@@ -62,7 +62,9 @@ http.createServer(async (req, res) => {
     } else if (req.method === "POST") {
       const list = Array.isArray(body) ? body : [body];
       const keys = [...new Set(list.flatMap((r) => Object.keys(r)))];
-      const vals = list.map((r) => "(" + keys.map((k) => { args.push(r[k] ?? null); return `$${args.length}`; }).join(",") + ")").join(",");
+      // Like PostgREST: an array of objects (jsonb) is sent as JSON; an array of strings stays an array (text[])
+      const val = (v) => (Array.isArray(v) && v.some((x) => x && typeof x === "object") ? JSON.stringify(v) : v ?? null);
+      const vals = list.map((r) => "(" + keys.map((k) => { args.push(val(r[k])); return `$${args.length}`; }).join(",") + ")").join(",");
       let sql = `insert into public.${ident(path)} (${keys.map(ident).join(",")}) values ${vals}`;
       const conflict = url.searchParams.get("on_conflict");
       if (prefer.includes("ignore-duplicates")) sql += ` on conflict${conflict ? ` (${conflict.split(",").map(ident).join(",")})` : ""} do nothing`;

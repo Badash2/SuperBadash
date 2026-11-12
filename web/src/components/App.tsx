@@ -724,6 +724,8 @@ function Main({ session }: { session: Session }) {
           onClose={() => setOpenCode(null)}
           onOpen={setOpenCode}
           onAdd={(i) => onAdd(i)}
+          me={me}
+          members={members}
         />
       )}
 

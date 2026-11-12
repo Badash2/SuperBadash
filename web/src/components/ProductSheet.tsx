@@ -14,6 +14,17 @@ import { displayName } from "@/lib/text";
 import type { PriceRow } from "@/lib/types";
 import { ProductImage } from "./ProductImage";
 import { PriceChart } from "./PriceChart";
+import {
+  HealthSection,
+  NotesSection,
+  ResearchSection,
+  ReviewsSection,
+  type Research,
+} from "./ProductHealth";
+import { DEFAULT_HEALTH, type HealthPrefs } from "@/lib/health";
+import { fetchProductInfo, INFO_VERSION, normalizeInfo } from "@/lib/nutrition";
+import { normalizedSize } from "@/lib/history";
+import type { Member, ProductInfo } from "@/lib/types";
 
 const RANGES: [number, string][] = [
   [30, "חודש"],
@@ -40,12 +51,62 @@ export function ProductSheet({
   onClose,
   onAdd,
   onOpen,
+  me,
+  members,
 }: {
   code: string;
   onClose: () => void;
   onAdd: (i: { code: string; name: string }) => void;
   onOpen: (code: string) => void;
+  me: string;
+  members: Member[];
 }) {
+  const [info, setInfo] = useState<ProductInfo | null>(null);
+  const [research, setResearch] = useState<Research | null>(null);
+  const [health, setHealth] = useState<HealthPrefs>(DEFAULT_HEALTH);
+  const nameOf = (email: string) => {
+    const m = members.find(
+      (x) => x.email.toLowerCase() === email.toLowerCase(),
+    );
+    return m?.display_name || email.split("@")[0];
+  };
+
+  // Health: product info (re-fetched from Open Food Facts if the row is old), research results, personal thresholds
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [pi, rs, hp] = await Promise.all([
+        supabase
+          .from("product_info")
+          .select("*")
+          .eq("code", code)
+          .maybeSingle(),
+        supabase
+          .from("product_research")
+          .select("*")
+          .eq("code", code)
+          .maybeSingle(),
+        supabase
+          .from("health_prefs")
+          .select("*")
+          .ilike("email", me)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setResearch((rs.data as Research | null) ?? null);
+      if (hp.data)
+        setHealth({ ...DEFAULT_HEALTH, ...(hp.data as Partial<HealthPrefs>) });
+      const row = pi.data ? normalizeInfo(pi.data as ProductInfo) : null;
+      setInfo(row);
+      if (!row || (row.v ?? 1) < INFO_VERSION) {
+        const fresh = await fetchProductInfo(code);
+        if (!cancelled && fresh) setInfo(fresh);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, me]);
   const [product, setProduct] = useState<Product | null>(null);
   const [history, setHistory] = useState<Change[] | null>(null);
   const [prices, setPrices] = useState<PriceRow[]>([]);
@@ -204,6 +265,16 @@ export function ProductSheet({
           </section>
         )}
 
+        <HealthSection
+          info={info}
+          research={research}
+          prefs={health}
+          liquid={
+            normalizedSize(product?.quantity ?? null, product?.unit ?? null)
+              ?.family === "ml"
+          }
+        />
+
         <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 shadow-card">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-bold text-fg">היסטוריית מחיר</h3>
@@ -334,6 +405,14 @@ export function ProductSheet({
             ))}
           </section>
         )}
+        <ReviewsSection research={research} />
+        <NotesSection code={code} me={me} nameOf={nameOf} />
+        <ResearchSection
+          code={code}
+          name={product?.name ?? code}
+          research={research}
+        />
+
         {byStore.size === 0 && history != null && (
           <p className="text-sm text-muted">
             אין כרגע מחיר למוצר הזה בסניפים שלנו.

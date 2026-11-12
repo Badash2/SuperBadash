@@ -15,6 +15,7 @@ const db = new Pool({ connectionString: DB_URL, max: 8 });
 const log = [];
 const errors = [];
 let PAGE;
+let PAGE_UPLOADS = [];
 
 async function asFamily(sql, params) {
   const c = await db.connect();
@@ -144,6 +145,13 @@ async function simulateHistory(code) {
   });
   const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: SCHEME, permissions: ["camera"] });
   await ctx.route(`https://${REF}.supabase.co/rest/v1/**`, handle);
+  // Storage (photo uploads): a fake reply; recorded so we can check an upload happened
+  const uploads = [];
+  await ctx.route(`https://${REF}.supabase.co/storage/v1/**`, (r) => {
+    uploads.push(new URL(r.request().url()).pathname);
+    return r.fulfill({ status: 200, contentType: "application/json", body: '{"Key":"ok"}' });
+  });
+  PAGE_UPLOADS = uploads;
   // The notification endpoints are tested separately (notify-api.cjs); here we only check that the UI calls them
   const apiCalls = [];
   await ctx.route(`${BASE}/api/**`, (r) => { apiCalls.push(new URL(r.request().url()).pathname); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true,"sent":0}' }); });
@@ -221,7 +229,7 @@ async function simulateHistory(code) {
   await page.locator("nav button").nth(3).click();
   await page.getByText("המבצעים האמיתיים הכי טובים", { exact: false }).waitFor();
   await page.waitForTimeout(2500);
-  const initialSel = await page.locator('[role="tab"][aria-selected="true"]').innerText();
+  const initialSel = await page.locator("[aria-label=\"סינון לפי סופר\"] [aria-selected=true]").innerText();
   await page.getByRole("tab", { name: "רמי לוי" }).click();
   await page.waitForTimeout(2500);
   await page.screenshot({ path: P("6-deals") });
@@ -258,6 +266,38 @@ async function simulateHistory(code) {
   await page.waitForTimeout(800);
   await page.screenshot({ path: P("9-price-moves") });
   console.log("price moves:", (await page.locator("ul.divide-y li").first().innerText()).replace(/\s+/g, " "));
+
+  // Deals gallery: large images
+  await page.getByRole("tab", { name: "גלריה" }).click();
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: P("10-deals-grid") });
+  const tiles = await page.locator("div.grid.grid-cols-2 > div").count();
+  await page.getByRole("tab", { name: "רשימה" }).click();
+
+  // Product card for Bamba: health (the research results), notes, a research request, a photo upload
+  await db.query("delete from research_requests where code='7290000066318'");
+  await db.query("delete from product_notes where code='7290000066318'");
+  await page.locator("nav button").first().click();
+  await page.getByRole("button", { name: /^במבה 80 גרם/ }).first().click();
+  await page.getByText("בריאות וערכים תזונתיים").waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  const badges = await page.locator("[role=dialog] section").filter({ hasText: "בריאות וערכים תזונתיים" }).locator("div.flex.flex-wrap.gap-2 > span").allInnerTexts();
+  await page.getByPlaceholder("למשל: הילדים לא אוהבים", { exact: false }).fill("הילדים אוהבים, לקנות 2");
+  await page.getByRole("button", { name: "הוסיפו", exact: true }).last().click();
+  await page.waitForTimeout(600);
+  await page.getByRole("button", { name: "חפשו לי בסבב הבא" }).click();
+  await page.waitForTimeout(600);
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles(`${OUT}/barcode.png`);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: P("11-product-health"), fullPage: false });
+  await page.locator("[role=dialog]").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: P("12-product-bottom") });
+  const notes = (await db.query("select body from product_notes where code='7290000066318'")).rows.map((r) => r.body);
+  const reqs = (await db.query("select kind, status, photo_path is not null as has_photo from research_requests where code='7290000066318' order by requested_at")).rows;
+  console.log("deals grid tiles:", tiles, "| health badges:", JSON.stringify(badges));
+  console.log("notes:", JSON.stringify(notes), "| research requests:", JSON.stringify(reqs), "| uploads:", PAGE_UPLOADS.length);
+  await page.getByRole("button", { name: "חזרה" }).click();
 
   // Settings: changing preferences is saved for the user
   await page.getByRole("button", { name: "הגדרות" }).click();
