@@ -153,21 +153,27 @@ function fakeSession() {
   const redirected = page.url().endsWith("/scanner");
 
   await page.getByRole("button", { name: "לאפליקציה הרגילה" }).click();
-  await page.locator("h3", { hasText: "נגמר לאחרונה" }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(800);
-  await page.screenshot({ path: `${OUT}/kiosk-2-ran-out-panel.png` });
-  await page.getByRole("button", { name: "+ לרשימה" }).first().click();
+  await page.getByPlaceholder("מה צריך?", { exact: false }).waitFor({ timeout: 15000 });
   await page.waitForTimeout(1500);
+  // The core requirement: a scan by the bin does NOT go onto the list on its own
+  const listBefore = (await db.query("select count(*)::int n from shopping_items")).rows[0].n;
+  const panelOnList = await page.getByText("נגמר לאחרונה").count();
+  const tabLabel = await page.locator("nav button").nth(1).innerText();
+  await page.locator("nav button").nth(1).click();
+  await page.getByRole("button", { name: "+ לרשימה" }).first().waitFor({ timeout: 10000 });
+  await page.screenshot({ path: `${OUT}/kiosk-2-ranout-tab.png` });
+  await page.getByRole("button", { name: "+ לרשימה" }).first().click();
+  await page.getByText("✓ ברשימה").waitFor({ timeout: 10000 });
+  await page.screenshot({ path: `${OUT}/kiosk-3-after-add.png` });
   const items = (await db.query("select name from shopping_items")).rows.map((r) => r.name);
   const status = (await db.query("select status from consumed_items")).rows.map((r) => r.status);
-  const panelGone = (await page.locator("h3", { hasText: "נגמר לאחרונה" }).count()) === 0;
-  console.log("url after add:", page.url());
-  await page.screenshot({ path: `${OUT}/kiosk-3-after-add.png`, fullPage: true });
-
+  const tabAfter = await page.locator("nav button").nth(1).innerText();
+  console.log("list empty before a manual add:", listBefore === 0, "| no suggestions panel on list:", panelOnList === 0);
+  console.log("tab:", tabLabel.replace(/\s+/g, " "), "->", tabAfter.replace(/\s+/g, " "));
   console.log("recorded:", JSON.stringify(rows1));
   console.log("no duplicate while barcode stays in view:", rows2 === 1);
   console.log("fixed-device redirect / -> /scanner:", redirected);
-  console.log("added to list:", items, "| consumed status:", status, "| panel cleared:", panelGone);
+  console.log("added to list after click:", items, "| consumed status:", status);
   console.log("errors:", errors.length ? errors : "none");
   await browser.close();
   await db.end();

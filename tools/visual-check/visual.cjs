@@ -180,10 +180,10 @@ const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
   await page.waitForTimeout(600);
   await page.screenshot({ path: P("4-in-store"), fullPage: true });
 
-  await page.locator("nav button").nth(1).click();
+  await page.locator("nav button").nth(2).click();
   await page.waitForTimeout(800);
   await page.screenshot({ path: P("5-compare"), fullPage: true });
-  await page.locator("nav button").nth(2).click();
+  await page.locator("nav button").nth(3).click();
   await page.getByText("המבצעים האמיתיים הכי טובים", { exact: false }).waitFor();
   await page.waitForTimeout(2500);
   const initialSel = await page.locator('[role="tab"][aria-selected="true"]').innerText();

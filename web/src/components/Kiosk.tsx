@@ -282,8 +282,8 @@ function Station() {
           </div>
         ) : (
           <div className="rounded-2xl bg-[#ffffff]/5 p-4 text-center text-[#a0aca5]">
-            לפני שזורקים אריזה ריקה - מקרבים את הברקוד למצלמה. זה יופיע באתר תחת
-            &quot;נגמר לאחרונה&quot;.
+            לפני שזורקים אריזה ריקה - מקרבים את הברקוד למצלמה. זה יופיע באתר
+            בלשונית &quot;נגמר&quot;.
           </div>
         )}
 

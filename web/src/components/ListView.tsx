@@ -27,14 +27,6 @@ import { NutritionChip } from "./NutritionChip";
 import { displayName } from "@/lib/text";
 import { useState } from "react";
 
-/** A product that ran out (scanned at the scanner by the bin), grouped by barcode. */
-export type RanOut = {
-  code: string;
-  name: string;
-  count: number;
-  last: string;
-};
-
 type Props = {
   items: ListItem[];
   prices: PriceMap;
@@ -45,9 +37,6 @@ type Props = {
   setCurrentStore: (s: string) => void;
   aisle: Map<string, number>;
   overrides: Map<string, string>;
-  ranOut: RanOut[];
-  onRanOutAdd: (r: RanOut) => void;
-  onRanOutDismiss: (r: RanOut) => void;
   onAdd: AddFn;
   onScan: () => void;
   onToggle: (item: ListItem) => void;
@@ -115,14 +104,6 @@ export function ListView(p: Props) {
   return (
     <div className="space-y-5">
       <AddBar onAdd={p.onAdd} onScan={p.onScan} />
-
-      {p.ranOut.length > 0 && (
-        <RanOutPanel
-          items={p.ranOut}
-          onAdd={p.onRanOutAdd}
-          onDismiss={p.onRanOutDismiss}
-        />
-      )}
 
       <label className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2 shadow-card">
         <span className="text-sm text-muted">אני עכשיו ב</span>
@@ -359,64 +340,5 @@ function Row({
         </div>
       </div>
     </li>
-  );
-}
-
-function ago(iso: string): string {
-  const h = Math.round((Date.now() - new Date(iso).getTime()) / 3600000);
-  if (h < 1) return "הרגע";
-  if (h < 24) return `לפני ${h} שע׳`;
-  const d = Math.round(h / 24);
-  return d === 1 ? "אתמול" : `לפני ${d} ימים`;
-}
-
-/** "Ran out recently": what was scanned at the bin and isn't on the list yet. One tap -> to the list. */
-function RanOutPanel({
-  items,
-  onAdd,
-  onDismiss,
-}: {
-  items: RanOut[];
-  onAdd: (r: RanOut) => void;
-  onDismiss: (r: RanOut) => void;
-}) {
-  return (
-    <section className="space-y-2 rounded-2xl border border-line bg-surface p-3 shadow-card">
-      <h3 className="flex items-center gap-2 text-sm font-bold text-fg">
-        🗑️ נגמר לאחרונה
-        <span className="rounded-full bg-surface-2 px-2 text-xs font-semibold text-muted">
-          {items.length}
-        </span>
-      </h3>
-      <ul className="divide-y divide-line">
-        {items.map((r) => (
-          <li key={r.code} className="flex items-center gap-3 py-2">
-            <ProductImage code={r.code} size={40} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-fg">
-                {displayName(r.name)}
-              </div>
-              <div className="text-xs text-muted">
-                {ago(r.last)}
-                {r.count > 1 ? ` · נסרק ${r.count} פעמים` : ""}
-              </div>
-            </div>
-            <button
-              onClick={() => onDismiss(r)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center text-xl text-faint"
-              aria-label="לא צריך"
-            >
-              ×
-            </button>
-            <button
-              onClick={() => onAdd(r)}
-              className="h-10 shrink-0 rounded-2xl bg-brand px-3 text-sm font-bold text-brand-fg active:bg-brand-strong"
-            >
-              + לרשימה
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "./Scanner";
 import { isKioskDevice } from "./Kiosk";
-import type { RanOut } from "./ListView";
+import { RanOutView, type ConsumedRow } from "./RanOutView";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -19,7 +19,7 @@ import { ListView } from "./ListView";
 import { CompareView } from "./CompareView";
 import { DealsView } from "./DealsView";
 
-type Tab = "list" | "compare" | "deals";
+type Tab = "list" | "ranout" | "compare" | "deals";
 type Gate = "loading" | "signed-out" | "not-family" | "ok";
 
 export default function App() {
@@ -198,9 +198,8 @@ function Main({ session }: { session: Session }) {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   // Main is rendered only on the client (after login), so localStorage can be read in the initialiser
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
-  const [ranOutRows, setRanOutRows] = useState<
-    { id: string; code: string; name: string; scanned_at: string }[]
-  >([]);
+  const [ranOutRows, setRanOutRows] = useState<ConsumedRow[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [scanning, setScanning] = useState(false);
   const [currentStore, setCurrentStoreState] = useState(() => {
     try {
@@ -220,19 +219,11 @@ function Main({ session }: { session: Session }) {
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const { data } = await supabase
       .from("consumed_items")
-      .select("id,code,name,scanned_at")
-      .eq("status", "new")
+      .select("id,code,name,scanned_at,status")
       .gte("scanned_at", since)
       .order("scanned_at", { ascending: false });
-    if (data)
-      setRanOutRows(
-        data as {
-          id: string;
-          code: string;
-          name: string;
-          scanned_at: string;
-        }[],
-      );
+    if (data) setRanOutRows(data as ConsumedRow[]);
+    setNow(Date.now());
   }, []);
 
   const loadItems = useCallback(async () => {
@@ -478,40 +469,40 @@ function Main({ session }: { session: Session }) {
       set_at: new Date().toISOString(),
     });
   };
-  // "Ran out" from the scanner by the bin: grouped by product (the same milk scanned 3 times = one item)
-  const ranOut: RanOut[] = useMemo(() => {
-    const onList = new Set(
-      items.filter((i) => !i.checked && i.code).map((i) => i.code),
-    );
-    const m = new Map<string, RanOut>();
-    for (const r of ranOutRows) {
-      if (onList.has(r.code)) continue;
-      const g = m.get(r.code);
-      if (g) g.count++;
-      else
-        m.set(r.code, {
-          code: r.code,
-          name: r.name,
-          count: 1,
-          last: r.scanned_at,
-        });
-    }
-    return [...m.values()];
-  }, [ranOutRows, items]);
-
+  // "Ran out" from the scanner by the bin - a separate tab, nothing goes to the list without a click
+  const onListCodes = useMemo(
+    () =>
+      new Set(
+        items.filter((i) => !i.checked && i.code).map((i) => i.code as string),
+      ),
+    [items],
+  );
+  const ranOutNewCount = useMemo(
+    () =>
+      new Set(
+        ranOutRows
+          .filter((r) => r.status === "new" && !onListCodes.has(r.code))
+          .map((r) => r.code),
+      ).size,
+    [ranOutRows, onListCodes],
+  );
   const markRanOut = async (code: string, status: "added" | "dismissed") => {
-    setRanOutRows((prev) => prev.filter((r) => r.code !== code));
+    setRanOutRows((prev) =>
+      prev.map((r) =>
+        r.code === code && r.status === "new" ? { ...r, status } : r,
+      ),
+    );
     await supabase
       .from("consumed_items")
       .update({ status, handled_at: new Date().toISOString() })
       .eq("code", code)
       .eq("status", "new");
   };
-  const onRanOutAdd = async (r: RanOut) => {
-    await onAdd({ code: r.code, name: r.name });
-    await markRanOut(r.code, "added");
+  const onRanOutAdd = async (g: { code: string; name: string }) => {
+    await onAdd({ code: g.code, name: g.name });
+    await markRanOut(g.code, "added");
   };
-  const onRanOutDismiss = (r: RanOut) => markRanOut(r.code, "dismissed");
+  const onRanOutHide = (code: string) => markRanOut(code, "dismissed");
 
   const onFinish = async () => {
     const done = items
@@ -611,9 +602,6 @@ function Main({ session }: { session: Session }) {
               setCurrentStore,
               aisle,
               overrides,
-              ranOut,
-              onRanOutAdd,
-              onRanOutDismiss,
               onAdd,
               onToggle,
               onQty,
@@ -622,6 +610,15 @@ function Main({ session }: { session: Session }) {
               onFinish,
             }}
             onScan={() => setScanning(true)}
+          />
+        )}
+        {tab === "ranout" && (
+          <RanOutView
+            rows={ranOutRows}
+            onList={onListCodes}
+            now={now}
+            onAdd={onRanOutAdd}
+            onHide={onRanOutHide}
           />
         )}
         {tab === "compare" && (
@@ -646,10 +643,15 @@ function Main({ session }: { session: Session }) {
       )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className="mx-auto grid max-w-2xl grid-cols-3">
+        <div className="mx-auto grid max-w-2xl grid-cols-4">
           {(
             [
               ["list", "📝", `רשימה${openCount ? ` (${openCount})` : ""}`],
+              [
+                "ranout",
+                "🗑️",
+                `נגמר${ranOutNewCount ? ` (${ranOutNewCount})` : ""}`,
+              ],
               ["compare", "⚖️", "איפה לקנות"],
               ["deals", "🔥", "מבצעים"],
             ] as [Tab, string, string][]
@@ -660,7 +662,7 @@ function Main({ session }: { session: Session }) {
               className={`flex flex-col items-center gap-0.5 py-2 text-xs ${tab === k ? "font-bold text-brand" : "text-muted"}`}
             >
               <span
-                className={`rounded-full px-4 py-0.5 text-xl transition-colors ${tab === k ? "bg-brand-soft" : ""}`}
+                className={`rounded-full px-3 py-0.5 text-xl transition-colors ${tab === k ? "bg-brand-soft" : ""}`}
               >
                 {icon}
               </span>
