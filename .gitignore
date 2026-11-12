@@ -12,3 +12,4 @@ deals.json
 node_modules/
 .next/
 .vercel/
+secrets-for-you/

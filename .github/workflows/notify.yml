@@ -1,0 +1,20 @@
+name: notify
+
+# Every hour: the server checks who has a daily digest due and whether there are new deals for "every deal".
+# The endpoint is idempotent (notification_log prevents a double send), so it needs no secret.
+on:
+  schedule:
+    - cron: "3 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger notification run
+        run: |
+          code=$(curl -sS -o out.json -w "%{http_code}" -X POST https://super-badash.vercel.app/api/notify/run)
+          cat out.json; echo
+          if [ "$code" = "503" ]; then echo "::warning::Notifications not configured yet (Vercel env vars missing)"; exit 0; fi
+          [ "$code" = "200" ]

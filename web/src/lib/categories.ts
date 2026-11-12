@@ -14,7 +14,8 @@ const COMPILED: [string, RegExp][] = rules.rules.map(([id, src]) => [
 ]);
 
 /** Flavour/scent descriptions mislead ("נודלס בטעם בקר" is not meat) - remove them before matching. */
-const stripFlavour = (n: string) => n.replace(/(?:בטעם|בניחוח|ניחוח|טעם)\s+\S+(?:\s+\S+)?/g, " ");
+const stripFlavour = (n: string) =>
+  n.replace(/(?:בטעם|בניחוח|ניחוח|טעם)\s+\S+(?:\s+\S+)?/g, " ");
 
 /** The section by product name. Measured: ~88% of popular products classified automatically. */
 export function classify(name: string): string {
@@ -24,4 +25,5 @@ export function classify(name: string): string {
 }
 
 /** The key that a family override is stored under: the barcode/product code, or the free text. */
-export const itemKey = (i: { code: string | null; name: string }) => i.code ?? i.name.trim();
+export const itemKey = (i: { code: string | null; name: string }) =>
+  i.code ?? i.name.trim();

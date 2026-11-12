@@ -88,7 +88,9 @@ async function handle(route) {
         const keys = Object.keys(list[0]);
         const vals = list.map((r) => "(" + keys.map((k) => { args.push(r[k]); return `$${args.length}`; }).join(",") + ")").join(",");
         let sql = `insert into public.${ident(path)} (${keys.map(ident).join(",")}) values ${vals}`;
-        const pk = path === "item_categories" ? "item_key" : "code";
+        // Like PostgREST: on_conflict if given, otherwise the table's primary key
+        const PK = { item_categories: "item_key", notification_prefs: "email", member_status: "email", push_subscriptions: "endpoint" };
+        const pk = url.searchParams.get("on_conflict") || PK[path] || "code";
         if (prefer.includes("merge-duplicates"))
           sql += ` on conflict (${pk}) do update set ` + keys.filter((k) => k !== pk).map((k) => `${ident(k)} = excluded.${ident(k)}`).join(",");
         rows = await asFamily(sql + " returning *", args);
@@ -124,12 +126,15 @@ function fakeSession() {
 const SCHEME = process.env.SCHEME || "light";
 const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
 (async () => {
-  await db.query("truncate shopping_items, purchases, item_categories");
+  await db.query("truncate shopping_items, purchases, item_categories, notification_prefs");
   const browser = await chromium.launch({
     args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${OUT}/barcode.y4m`],
   });
   const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: SCHEME, permissions: ["camera"] });
   await ctx.route(`https://${REF}.supabase.co/rest/v1/**`, handle);
+  // The notification endpoints are tested separately (notify-api.cjs); here we only check that the UI calls them
+  const apiCalls = [];
+  await ctx.route(`${BASE}/api/**`, (r) => { apiCalls.push(new URL(r.request().url()).pathname); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true,"sent":0}' }); });
   await ctx.route(`https://${REF}.supabase.co/auth/v1/**`, (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fakeSession().user) }));
   const page = await ctx.newPage();
@@ -197,6 +202,16 @@ const P = (n) => `${OUT}/${SCHEME}-${n}.png`;
   const allStores = await page.locator("section").last().locator("div.flex.flex-wrap.items-center span:nth-child(2)").allInnerTexts();
   console.log("deals filter: initial chip =", initialSel, "| rami-levy cards:", cardStores.length, "distinct:", [...new Set(cardStores)], "| db real deals at rami levy:", dbCount, "| all-stores distinct:", [...new Set(allStores)]);
 
+  // Settings: changing preferences is saved for the user
+  await page.getByRole("button", { name: "הגדרות" }).click();
+  await page.getByText("🔔 התראות במכשיר הזה").waitFor();
+  await page.getByRole("radio", { name: /כל מבצע אמיתי חדש/ }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: "אודליה", exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: P("7-settings"), fullPage: true });
+  const prefs = (await db.query("select deals, ran_out_from from notification_prefs where email=$1", [EMAIL])).rows[0];
+  console.log("settings saved:", JSON.stringify(prefs), "| notify calls:", [...new Set(apiCalls)]);
   const items = (await db.query("select name, checked from shopping_items order by added_at")).rows;
   console.log("scanned:", scanned);
   console.log("items:", items.map((i) => i.name + (i.checked ? "✓" : "")).join(" | "));

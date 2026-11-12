@@ -41,6 +41,8 @@ jobs:
           superbadash ingest
           superbadash publish-deals
           superbadash status
+          # New deals -> for whoever chose "every deal" (no failure if notifications aren't configured yet)
+          curl -sS -m 60 -X POST https://super-badash.vercel.app/api/notify/run || true
           superbadash deals --top 25 > deals.txt
           superbadash deals --verdict all --top 100000 --json > deals.json
       - uses: actions/upload-artifact@v4

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "./Scanner";
 import { isKioskDevice } from "./Kiosk";
 import { RanOutView, type ConsumedRow } from "./RanOutView";
+import { SettingsView } from "./SettingsView";
+import { notifyEvent } from "@/lib/push";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -19,7 +21,8 @@ import { ListView } from "./ListView";
 import { CompareView } from "./CompareView";
 import { DealsView } from "./DealsView";
 
-type Tab = "list" | "ranout" | "compare" | "deals";
+type Tab = "list" | "ranout" | "compare" | "deals" | "settings";
+const TABS: Tab[] = ["list", "ranout", "compare", "deals", "settings"];
 type Gate = "loading" | "signed-out" | "not-family" | "ok";
 
 export default function App() {
@@ -187,7 +190,13 @@ function Login() {
 
 function Main({ session }: { session: Session }) {
   const me = session.user.email ?? "";
-  const [tab, setTab] = useState<Tab>("list");
+  // A notification opens the app on the relevant screen (?tab=deals etc.)
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = new URLSearchParams(window.location.search).get(
+      "tab",
+    ) as Tab | null;
+    return t && TABS.includes(t) ? t : "list";
+  });
   const [stores, setStores] = useState<Store[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [items, setItems] = useState<ListItem[]>([]);
@@ -210,6 +219,15 @@ function Main({ session }: { session: Session }) {
   });
   const setCurrentStore = (s: string) => {
     setCurrentStoreState(s);
+    // "I'm in the store" - so whoever chose "list notifications only when I'm in the store" gets them
+    supabase
+      .from("member_status")
+      .upsert({
+        email: me,
+        current_store: s || null,
+        updated_at: new Date().toISOString(),
+      })
+      .then(() => {});
     try {
       localStorage.setItem("currentStore", s);
     } catch {}
@@ -379,6 +397,16 @@ function Main({ session }: { session: Session }) {
       prev.map((x) => (x.id === it.id ? { ...x, ...patch } : x)),
     );
     await supabase.from("shopping_items").update(patch).eq("id", it.id);
+    // Ticking in the store keeps "I'm in the store" fresh (expires after 3 hours with no activity)
+    if (currentStore && !it.checked)
+      supabase
+        .from("member_status")
+        .upsert({
+          email: me,
+          current_store: currentStore,
+          updated_at: new Date().toISOString(),
+        })
+        .then(() => {});
   };
   const onQty = async (it: ListItem, delta: number) => {
     const quantity = Math.max(1, Number(it.quantity) + delta);
@@ -422,6 +450,7 @@ function Main({ session }: { session: Session }) {
       .insert({ code, name, ...cart })
       .select()
       .single();
+    if (data && !toCart) notifyEvent("list_add", (data as ListItem).id);
     if (data)
       setItems((prev) => [
         ...prev,
@@ -578,15 +607,25 @@ function Main({ session }: { session: Session }) {
             )}
           </div>
         </div>
-        <button
-          onClick={() => {
-            if (confirm(`להתנתק מ-${me}?`)) supabase.auth.signOut();
-          }}
-          className="flex min-h-10 shrink-0 items-center rounded-full bg-surface-2 px-3 text-xs font-medium text-muted"
-          title={`${me} - לחיצה להתנתקות`}
-        >
-          {(session.user.user_metadata?.full_name ?? me).split(" ")[0]}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => setTab("settings")}
+            aria-label="הגדרות"
+            title="הגדרות והתראות"
+            className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${tab === "settings" ? "bg-brand-soft" : "bg-surface-2"}`}
+          >
+            ⚙️
+          </button>
+          <button
+            onClick={() => {
+              if (confirm(`להתנתק מ-${me}?`)) supabase.auth.signOut();
+            }}
+            className="flex min-h-10 shrink-0 items-center rounded-full bg-surface-2 px-3 text-xs font-medium text-muted"
+            title={`${me} - לחיצה להתנתקות`}
+          >
+            {(session.user.user_metadata?.full_name ?? me).split(" ")[0]}
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-4 pb-28 pt-5">
@@ -610,6 +649,21 @@ function Main({ session }: { session: Session }) {
               onFinish,
             }}
             onScan={() => setScanning(true)}
+          />
+        )}
+        {tab === "settings" && (
+          <SettingsView
+            me={me}
+            members={members}
+            onRenamed={(n) =>
+              setMembers((prev) =>
+                prev.map((m) =>
+                  m.email.toLowerCase() === me.toLowerCase()
+                    ? { ...m, display_name: n }
+                    : m,
+                ),
+              )
+            }
           />
         )}
         {tab === "ranout" && (

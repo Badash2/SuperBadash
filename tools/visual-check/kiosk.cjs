@@ -88,7 +88,9 @@ async function handle(route) {
         const keys = Object.keys(list[0]);
         const vals = list.map((r) => "(" + keys.map((k) => { args.push(r[k]); return `$${args.length}`; }).join(",") + ")").join(",");
         let sql = `insert into public.${ident(path)} (${keys.map(ident).join(",")}) values ${vals}`;
-        const pk = path === "item_categories" ? "item_key" : "code";
+        // Like PostgREST: on_conflict if given, otherwise the table's primary key
+        const PK = { item_categories: "item_key", notification_prefs: "email", member_status: "email", push_subscriptions: "endpoint" };
+        const pk = url.searchParams.get("on_conflict") || PK[path] || "code";
         if (prefer.includes("merge-duplicates"))
           sql += ` on conflict (${pk}) do update set ` + keys.filter((k) => k !== pk).map((k) => `${ident(k)} = excluded.${ident(k)}`).join(",");
         rows = await asFamily(sql + " returning *", args);
@@ -130,6 +132,9 @@ function fakeSession() {
   });
   const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: "dark", permissions: ["camera"] });
   await ctx.route(`https://${REF}.supabase.co/rest/v1/**`, handle);
+  // The notification endpoints are tested separately (notify-api.cjs); here we only check that the UI calls them
+  const apiCalls = [];
+  await ctx.route(`${BASE}/api/**`, (r) => { apiCalls.push(new URL(r.request().url()).pathname); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true,"sent":0}' }); });
   await ctx.route(`https://${REF}.supabase.co/auth/v1/**`, (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fakeSession().user) }));
   const page = await ctx.newPage();
@@ -174,6 +179,7 @@ function fakeSession() {
   console.log("no duplicate while barcode stays in view:", rows2 === 1);
   console.log("fixed-device redirect / -> /scanner:", redirected);
   console.log("added to list after click:", items, "| consumed status:", status);
+  console.log("notify calls from UI:", [...new Set(apiCalls)]);
   console.log("errors:", errors.length ? errors : "none");
   await browser.close();
   await db.end();

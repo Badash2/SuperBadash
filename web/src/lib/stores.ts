@@ -8,7 +8,10 @@ export const STORE_META: Record<string, { short: string; color: string }> = {
   "osher-ad-netanya": { short: "אושר עד", color: "#9333ea" },
 };
 
-export function storeShort(key: string | null | undefined, fallback?: string): string {
+export function storeShort(
+  key: string | null | undefined,
+  fallback?: string,
+): string {
   if (!key) return "";
   return STORE_META[key]?.short ?? fallback ?? key;
 }

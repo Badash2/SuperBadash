@@ -14,7 +14,11 @@ export function effectivePrice(r: PriceRow, qty = 1): number {
 }
 
 export function isGoodDeal(r: PriceRow): boolean {
-  return r.verdict === "real" && r.promo_unit_price != null && r.promo_unit_price < r.price;
+  return (
+    r.verdict === "real" &&
+    r.promo_unit_price != null &&
+    r.promo_unit_price < r.price
+  );
 }
 
 export const VERDICT: Record<string, { label: string; cls: string }> = {

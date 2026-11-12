@@ -6,10 +6,12 @@ import { beep, createDetector, pickProductCode } from "@/lib/barcode";
 import { fetchProductInfo } from "@/lib/nutrition";
 import { displayName } from "@/lib/text";
 import { ProductImage } from "./ProductImage";
+import { notifyEvent } from "@/lib/push";
 
 const KIOSK_FLAG = "kioskMode";
 const SAME_CODE_COOLDOWN_MS = 8000; // the same product scanned twice in a row = one scan
 const UNDO_MS = 8000;
+const WHO_MS = 2 * 60 * 1000; // "who is scanning" stays selected for two minutes, then goes back to anonymous
 
 type Scan = { id: string; code: string; name: string; scanned_at: string };
 
@@ -86,6 +88,25 @@ function Station() {
   const [last, setLast] = useState<(Scan & { at: number }) | null>(null);
   const [recent, setRecent] = useState<Scan[]>([]);
   const [kiosk, setKiosk] = useState(isKioskDevice);
+  // Who is scanning (optional): so whoever chose "ran out only from Odelia's scans" gets just those
+  const [members, setMembers] = useState<
+    { email: string; display_name: string | null }[]
+  >([]);
+  const [who, setWho] = useState<{ email: string; until: number } | null>(null);
+  const whoRef = useRef<{ email: string; until: number } | null>(null);
+  useEffect(() => {
+    whoRef.current = who;
+  }, [who]);
+  useEffect(() => {
+    supabase
+      .from("family_members")
+      .select("email,display_name")
+      .then(({ data }) =>
+        setMembers(
+          (data as { email: string; display_name: string | null }[]) ?? [],
+        ),
+      );
+  }, []);
   const [now, setNow] = useState(() => Date.now());
 
   const loadRecent = useCallback(async () => {
@@ -108,7 +129,15 @@ function Station() {
         name = (await fetchProductInfo(code))?.off_name || `מוצר ${code}`;
       const { data: row, error } = await supabase
         .from("consumed_items")
-        .insert({ code, name, device: "bin-scanner" })
+        .insert({
+          code,
+          name,
+          device: "bin-scanner",
+          scanned_as:
+            whoRef.current && whoRef.current.until > Date.now()
+              ? whoRef.current.email.toLowerCase()
+              : null,
+        })
         .select("id,code,name,scanned_at")
         .single();
       if (error || !row) {
@@ -118,6 +147,7 @@ function Station() {
       }
       beep(true);
       navigator.vibrate?.(80);
+      notifyEvent("ran_out", (row as Scan).id);
       setLast({ ...(row as Scan), at: Date.now() });
       setStatus("מוכן לסריקה הבאה");
       loadRecent();
@@ -262,6 +292,37 @@ function Station() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="space-y-1.5">
+          <div className="text-xs text-[#a0aca5]">מי סורק? (לא חובה)</div>
+          <div className="flex flex-wrap gap-2">
+            {members.map((m) => {
+              const active = !!who && who.email === m.email && who.until > now;
+              return (
+                <button
+                  key={m.email}
+                  onClick={() =>
+                    setWho(
+                      active
+                        ? null
+                        : { email: m.email, until: Date.now() + WHO_MS },
+                    )
+                  }
+                  className={`min-h-10 rounded-full px-4 text-sm font-medium ${
+                    active
+                      ? "bg-[#3cc985] text-[#062014]"
+                      : "bg-[#ffffff]/10 text-[#e9efea]"
+                  }`}
+                >
+                  {m.display_name || m.email.split("@")[0]}
+                  {active
+                    ? ` · ${Math.ceil((who!.until - now) / 60000)} דק׳`
+                    : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {showLast ? (
           <div className="flex items-center gap-3 rounded-2xl bg-[#15301f] p-3">
             <ProductImage code={last.code} size={64} />
