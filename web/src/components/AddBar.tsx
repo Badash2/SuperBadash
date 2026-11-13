@@ -6,6 +6,7 @@ import { ProductImage } from "./ProductImage";
 import { ils } from "@/lib/pricing";
 import { displayName } from "@/lib/text";
 import { itemEmoji } from "@/lib/produce";
+import { unlockAudio } from "@/lib/barcode";
 
 // Produce has no barcode - quick add with one tap
 const QUICK_PRODUCE = [
@@ -97,7 +98,11 @@ export function AddBar({
             />
             <button
               type="button"
-              onClick={onScan}
+              onClick={() => {
+                // unlocking sound inside the tap itself - so the scanner's beep is heard on iPhone too
+                unlockAudio();
+                onScan();
+              }}
               aria-label="סריקת ברקוד"
               title="סריקת ברקוד"
               className="absolute end-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-brand"

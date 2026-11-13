@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { createDetector } from "@/lib/barcode";
+import { beep, createDetector } from "@/lib/barcode";
 
 type Mode = "list" | "cart";
 
@@ -66,6 +66,7 @@ export function Scanner({
               if (code && now - (recent.get(code) ?? 0) > 2500) {
                 recent.set(code, now);
                 busy = true;
+                beep(true);
                 navigator.vibrate?.(60);
                 setStatus("מחפש מוצר...");
                 const name = await onCode(code, modeRef.current);

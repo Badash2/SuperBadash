@@ -2,7 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { beep, createDetector, pickProductCode } from "@/lib/barcode";
+import {
+  audioReady,
+  beep,
+  createDetector,
+  pickProductCode,
+  unlockAudio,
+} from "@/lib/barcode";
 import { fetchProductInfo } from "@/lib/nutrition";
 import { displayName } from "@/lib/text";
 import { ProductImage } from "./ProductImage";
@@ -108,6 +114,20 @@ function Station() {
       );
   }, []);
   const [now, setNow] = useState(() => Date.now());
+  // Sound: the browser blocks it until the first touch. Any touch on the screen unlocks it.
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    // The first touch unlocks sound and plays a confirmation beep (also when the touch lands on the button,
+    // which disappears before the click - so the beep is here and not on the button)
+    const onTouch = async () => {
+      const was = audioReady();
+      const ok = await unlockAudio();
+      if (ok && !was) beep(true);
+      setSoundOn(ok);
+    };
+    document.addEventListener("pointerdown", onTouch);
+    return () => document.removeEventListener("pointerdown", onTouch);
+  }, []);
 
   const loadRecent = useCallback(async () => {
     const { data } = await supabase
@@ -251,7 +271,10 @@ function Station() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load from the server
     loadRecent();
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    const t = setInterval(() => {
+      setNow(Date.now());
+      setSoundOn(audioReady());
+    }, 1000);
     return () => clearInterval(t);
   }, [loadRecent]);
 
@@ -292,6 +315,14 @@ function Station() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {!soundOn && (
+          <button
+            onClick={() => unlockAudio().then(setSoundOn)}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#3a2a12] px-4 text-sm font-bold text-[#f0b04a]"
+          >
+            🔊 לחצו פעם אחת להפעלת צליל הסריקה
+          </button>
+        )}
         <div className="space-y-1.5">
           <div className="text-xs text-[#a0aca5]">מי סורק? (לא חובה)</div>
           <div className="flex flex-wrap gap-2">

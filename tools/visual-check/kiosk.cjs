@@ -128,7 +128,7 @@ function fakeSession() {
 (async () => {
   await db.query("truncate shopping_items, consumed_items");
   const browser = await chromium.launch({
-    args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${OUT}/barcode.y4m`],
+    args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${OUT}/barcode.y4m`, "--autoplay-policy=user-gesture-required"],
   });
   const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: "dark", permissions: ["camera"] });
   await ctx.route(`https://${REF}.supabase.co/rest/v1/**`, handle);
@@ -137,6 +137,18 @@ function fakeSession() {
   await ctx.route(`${BASE}/api/**`, (r) => { apiCalls.push(new URL(r.request().url()).pathname); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true,"sent":0}' }); });
   await ctx.route(`https://${REF}.supabase.co/auth/v1/**`, (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fakeSession().user) }));
+  // Records the sounds the page produces (frequency, wave, context state) - "hearing" without speakers
+  await ctx.addInitScript(() => {
+    window.__tones = [];
+    const orig = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function () {
+      const o = orig.call(this);
+      const ctx = this;
+      const start = o.start.bind(o);
+      o.start = (...a) => { window.__tones.push({ f: o.frequency.value, type: o.type, state: ctx.state }); return start(...a); };
+      return o;
+    };
+  });
   const page = await ctx.newPage();
   PAGE = page;
   page.on("pageerror", (e) => errors.push(e.message));
@@ -145,7 +157,17 @@ function fakeSession() {
   await page.goto(BASE + "/scanner");
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`sb-${REF}-auth-token`, JSON.stringify(fakeSession())]);
   await page.reload();
+  await page.getByRole("button", { name: /להפעלת צליל הסריקה/ }).waitFor({ timeout: 15000 });
+  const scannedBeforeTouch = await page.getByText("נרשם שנגמר").count();
+  const tonesBeforeTouch = await page.evaluate(() => window.__tones.length);
+  const soundBtnBefore = await page.getByRole("button", { name: /להפעלת צליל הסריקה/ }).count();
+  await page.getByRole("button", { name: /להפעלת צליל הסריקה/ }).click(); // one touch, like on the phone
+  await page.waitForTimeout(1500);
+  const soundBtnAfter = await page.getByRole("button", { name: /להפעלת צליל הסריקה/ }).count();
   await page.getByText("נרשם שנגמר").waitFor({ timeout: 30000 });
+  await page.waitForTimeout(500);
+  const tones = await page.evaluate(() => window.__tones);
+  console.log("scanned before touch:", scannedBeforeTouch, "| tones before touch:", tonesBeforeTouch, "| sound button before touch:", soundBtnBefore, "| after:", soundBtnAfter, "| tones:", JSON.stringify(tones));
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${OUT}/kiosk-1-scanned.png` });
   const rows1 = (await db.query("select code, name, status, device from consumed_items")).rows;
