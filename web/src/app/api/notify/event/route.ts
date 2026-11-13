@@ -3,6 +3,7 @@ import {
   admin,
   callerEmail,
   loadFamily,
+  DbError,
   NotConfigured,
   sendOnce,
 } from "@/lib/server/notify";
@@ -89,6 +90,8 @@ export async function POST(req: Request) {
     }
     return Response.json({ ok: true, sent });
   } catch (e) {
+    if (e instanceof DbError)
+      return Response.json({ error: "db", detail: e.message }, { status: 500 });
     if (e instanceof NotConfigured)
       return Response.json({ error: e.message }, { status: 503 });
     console.error(e);

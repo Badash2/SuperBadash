@@ -12,6 +12,7 @@ import {
   admin,
   loadFamily,
   markSent,
+  DbError,
   NotConfigured,
   ourProducts,
   sendOnce,
@@ -57,6 +58,7 @@ export async function POST() {
           .eq("verdict", "real"),
         ourProducts(db),
       ]);
+      if (d.error) throw new DbError(`deals: ${d.error.message}`);
       deals = (d.data ?? []) as DealLite[];
       ours = o;
       const codes = [
@@ -75,10 +77,11 @@ export async function POST() {
       names.get(d.code) ?? displayName(d.description ?? d.code);
 
     const since24h = new Date(now.getTime() - 24 * 3600000).toISOString();
-    const { data: scans } = await db
+    const { data: scans, error: scansError } = await db
       .from("consumed_items")
       .select("name,scanned_as,scanned_at")
       .gte("scanned_at", since24h);
+    if (scansError) throw new DbError(`consumed_items: ${scansError.message}`);
 
     for (const email of fam.members) {
       const p = prefsFor(email, fam.prefs);
@@ -162,6 +165,8 @@ export async function POST() {
     }
     return Response.json({ ok: true, at: now.toISOString(), ...report });
   } catch (e) {
+    if (e instanceof DbError)
+      return Response.json({ error: "db", detail: e.message }, { status: 500 });
     if (e instanceof NotConfigured)
       return Response.json({ error: e.message }, { status: 503 });
     console.error(e);

@@ -16,6 +16,8 @@ const SUPABASE_URL =
 const SITE = "https://super-badash.vercel.app";
 
 export class NotConfigured extends Error {}
+/** A database error (privileges, missing table) - reported, not swallowed. */
+export class DbError extends Error {}
 
 export function admin(): SupabaseClient {
   const key = process.env.SUPABASE_SECRET_KEY;
@@ -62,10 +64,17 @@ export async function loadFamily(db: SupabaseClient): Promise<Family> {
     db.from("family_members").select("email,display_name"),
     db.from("notification_prefs").select("*"),
   ]);
+  // A DB error must not look like "no data" (that's how a missing privilege hid behind "ok")
+  if (m.error) throw new DbError(`family_members: ${m.error.message}`);
+  if (p.error) throw new DbError(`notification_prefs: ${p.error.message}`);
   const rows = (m.data ?? []) as {
     email: string;
     display_name: string | null;
   }[];
+  if (rows.length === 0)
+    throw new DbError(
+      "family_members is empty - the server doesn't see the family",
+    );
   return {
     members: rows.map((r) => r.email),
     names: new Map(
