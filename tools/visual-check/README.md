@@ -25,6 +25,11 @@ Requires: Postgres 16, Playwright + Chromium (preinstalled in Claude cloud sessi
 ```bash
 npm run kiosk                  # scan at the bin -> "Ran out" tab -> to the list only by a click; a fixed device opens on /scanner
 
+# Photo reminder: a hand -> gesture recognition -> 10-second countdown -> photo -> "Ran out" tab -> to the list with a name.
+# (No public open-palm image - the test uses a thumb-up image + ?gesture=Thumb_Up; the same code path.)
+python3 make-hand.py thumbs_up.jpg
+SCHEME=dark npm run kiosk-photo   # also SCHEME=light
+
 # The notification server (the real route handlers) against a fake Supabase + a fake HTTPS push service:
 node mock-supabase.cjs &
 openssl req -x509 -newkey rsa:2048 -nodes -keyout out/push-key.pem -out out/push-cert.pem -days 2 -subj "/CN=localhost"

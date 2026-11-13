@@ -7,17 +7,29 @@ import {
   beep,
   createDetector,
   pickProductCode,
+  shutter,
+  tick,
   unlockAudio,
 } from "@/lib/barcode";
 import { fetchProductInfo } from "@/lib/nutrition";
 import { displayName } from "@/lib/text";
 import { ProductImage } from "./ProductImage";
 import { notifyEvent } from "@/lib/push";
+import {
+  createGestureRecognizer,
+  topGesture,
+  TRIGGER_GESTURE,
+} from "@/lib/gesture";
+import { uploadPhoto } from "@/lib/photos";
 import { isPerson, type Member } from "@/lib/types";
 
 const KIOSK_FLAG = "kioskMode";
-const SAME_CODE_COOLDOWN_MS = 8000; // the same product scanned twice in a row = one scan
+const SAME_CODE_COOLDOWN_MS = 8000; // the same barcode is counted again only after 8 seconds out of view
 const UNDO_MS = 8000;
+const COUNTDOWN_S = 10; // an open hand -> "get ready", 10 seconds, then a photo
+const GESTURE_EVERY_MS = 450; // gesture recognition twice a second - enough, and light on an old phone
+const GESTURE_HITS = 3; // three detections in a row (~1.3 seconds) - so a passing hand doesn't trigger
+const PHOTO_COOLDOWN_MS = 6000;
 const WHO_MS = 2 * 60 * 1000; // "who is scanning" stays selected for two minutes, then goes back to anonymous
 
 type Scan = { id: string; code: string; name: string; scanned_at: string };
@@ -90,6 +102,15 @@ function Center({ children }: { children: React.ReactNode }) {
 
 function Station() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // "scan" = scanning barcodes; "countdown" = getting ready for a photo (barcodes paused); "busy" = saving
+  const modeRef = useRef<"scan" | "countdown" | "busy">("scan");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [photo, setPhoto] = useState<{
+    id: string;
+    url: string;
+    at: number;
+  } | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
   const [status, setStatus] = useState("מפעיל מצלמה...");
   const [error, setError] = useState<string | null>(null);
   const [last, setLast] = useState<(Scan & { at: number }) | null>(null);
@@ -207,15 +228,18 @@ function Station() {
         setStatus("קרבו ברקוד של מוצר שנגמר");
         const tick = async () => {
           if (stopped) return;
-          if (!busy && v.readyState >= 2) {
+          if (!busy && v.readyState >= 2 && modeRef.current === "scan") {
             try {
               const code = pickProductCode(await detector.detect(v));
               const t = Date.now();
+              // Counted from the last time the barcode was *seen*: as long as it stays in front of the camera -
+              // one scan only, however long it's held there
+              const lastSeen = code ? recentCodes.get(code) : undefined;
+              if (code) recentCodes.set(code, t);
               if (
                 code &&
-                t - (recentCodes.get(code) ?? 0) > SAME_CODE_COOLDOWN_MS
+                (lastSeen == null || t - lastSeen > SAME_CODE_COOLDOWN_MS)
               ) {
-                recentCodes.set(code, t);
                 busy = true;
                 setStatus("רושם...");
                 await record(code);
@@ -278,6 +302,127 @@ function Station() {
     return () => clearInterval(t);
   }, [loadRecent]);
 
+  // ---------- an open hand -> countdown -> photo ----------
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let recognizer: Awaited<ReturnType<typeof createGestureRecognizer>> | null =
+      null;
+    let hits = 0;
+    let coolUntil = 0;
+    // For a test with a fake camera, another gesture can be set (?gesture=Thumb_Up)
+    const trigger =
+      new URLSearchParams(window.location.search).get("gesture") ||
+      TRIGGER_GESTURE;
+
+    const capture = async () => {
+      const v = videoRef.current;
+      if (!v || !v.videoWidth) return;
+      modeRef.current = "busy";
+      const c = document.createElement("canvas");
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+      c.getContext("2d")!.drawImage(v, 0, 0);
+      const blob = await new Promise<Blob | null>((res) =>
+        c.toBlob(res, "image/jpeg", 0.85),
+      );
+      shutter();
+      const path = blob ? await uploadPhoto("reminders", blob) : null;
+      const who =
+        whoRef.current && whoRef.current.until > Date.now()
+          ? whoRef.current.email.toLowerCase()
+          : null;
+      const { data: row } = path
+        ? await supabase
+            .from("photo_reminders")
+            .insert({ photo_path: path, scanned_as: who })
+            .select("id")
+            .single()
+        : { data: null };
+      if (row && blob) {
+        setPhoto({
+          id: (row as { id: string }).id,
+          url: URL.createObjectURL(blob),
+          at: Date.now(),
+        });
+        setStatus('📷 צולם - יופיע באתר בלשונית "נגמר"');
+      } else {
+        beep(false);
+        setStatus("הצילום לא נשמר - בדקו חיבור לאינטרנט");
+      }
+      coolUntil = Date.now() + PHOTO_COOLDOWN_MS;
+      modeRef.current = "scan";
+    };
+
+    const startCountdown = () => {
+      modeRef.current = "countdown";
+      let left = COUNTDOWN_S;
+      setCountdown(left);
+      tick();
+      const iv = setInterval(() => {
+        left -= 1;
+        if (left > 0) {
+          setCountdown(left);
+          tick();
+        } else {
+          clearInterval(iv);
+          cancelRef.current = null;
+          setCountdown(null);
+          capture();
+        }
+      }, 1000);
+      cancelRef.current = () => {
+        clearInterval(iv);
+        cancelRef.current = null;
+        setCountdown(null);
+        coolUntil = Date.now() + PHOTO_COOLDOWN_MS;
+        modeRef.current = "scan";
+      };
+    };
+
+    (async () => {
+      try {
+        recognizer = await createGestureRecognizer();
+      } catch {
+        return; // no gesture recognition on this device - barcode scanning keeps working as usual
+      }
+      if (stopped) return;
+      timer = setInterval(() => {
+        const v = videoRef.current;
+        if (
+          !recognizer ||
+          !v ||
+          v.readyState < 2 ||
+          modeRef.current !== "scan" ||
+          Date.now() < coolUntil
+        )
+          return;
+        try {
+          const g = topGesture(recognizer, v, performance.now());
+          hits = g && g.name === trigger && g.score > 0.6 ? hits + 1 : 0;
+          if (hits >= GESTURE_HITS) {
+            hits = 0;
+            startCountdown();
+          }
+        } catch {}
+      }, GESTURE_EVERY_MS);
+    })();
+
+    return () => {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      cancelRef.current?.();
+      recognizer?.close();
+    };
+  }, []);
+
+  const undoPhoto = async () => {
+    if (!photo) return;
+    await supabase.from("photo_reminders").delete().eq("id", photo.id);
+    setPhoto(null);
+    setStatus("הצילום בוטל");
+  };
+
   const undo = async () => {
     if (!last) return;
     await supabase.from("consumed_items").delete().eq("id", last.id);
@@ -306,10 +451,30 @@ function Station() {
           muted
           className="absolute inset-0 h-full w-full object-cover opacity-90"
         />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center ${countdown != null ? "hidden" : ""}`}
+        >
           <div className="h-32 w-64 rounded-2xl border-4 border-[#ffffff]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
         </div>
-        <div className="absolute inset-x-0 top-0 p-3 text-center text-sm font-medium">
+        {countdown != null && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-between bg-[#000000]/20 p-4 [text-shadow:0_2px_8px_rgba(0,0,0,0.7)]">
+            <div className="text-base font-bold">
+              📷 מכינים את המוצר מול המצלמה...
+            </div>
+            <div className="text-8xl font-extrabold tabular-nums">
+              {countdown}
+            </div>
+            <button
+              onClick={() => cancelRef.current?.()}
+              className="min-h-11 rounded-full bg-[#000000]/50 px-6 text-sm font-bold"
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+        <div
+          className={`absolute inset-x-0 top-0 p-3 text-center text-sm font-medium ${countdown != null ? "hidden" : ""}`}
+        >
           🗑️ סורק &quot;נגמר&quot; · {error ?? status}
         </div>
       </div>
@@ -354,6 +519,31 @@ function Station() {
           </div>
         </div>
 
+        {photo && now - photo.at < 15000 && (
+          <div className="flex items-center gap-3 rounded-2xl bg-[#14263a] p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a local image (object URL) */}
+            <img
+              src={photo.url}
+              alt=""
+              className="h-16 w-16 shrink-0 rounded-xl object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-[#8cc2f5]">📷 צולם כתזכורת</div>
+              <div className="text-xs text-[#a0aca5]">
+                יופיע באתר בלשונית &quot;נגמר&quot;
+              </div>
+            </div>
+            {now - photo.at < UNDO_MS && (
+              <button
+                onClick={undoPhoto}
+                className="h-11 shrink-0 rounded-2xl bg-[#ffffff]/15 px-4 font-bold"
+              >
+                ביטול
+              </button>
+            )}
+          </div>
+        )}
+
         {showLast ? (
           <div className="flex items-center gap-3 rounded-2xl bg-[#15301f] p-3">
             <ProductImage code={last.code} size={64} />
@@ -374,8 +564,8 @@ function Station() {
           </div>
         ) : (
           <div className="rounded-2xl bg-[#ffffff]/5 p-4 text-center text-[#a0aca5]">
-            לפני שזורקים אריזה ריקה - מקרבים את הברקוד למצלמה. זה יופיע באתר
-            בלשונית &quot;נגמר&quot;.
+            לפני שזורקים אריזה ריקה - מקרבים את הברקוד למצלמה. בלי ברקוד (ירקות,
+            פירות)? ✋ מראים יד פתוחה, ותוך 10 שניות הסורק מצלם תזכורת.
           </div>
         )}
 

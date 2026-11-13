@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // engines copied from the libraries at build (scripts/copy-zxing.mjs) - third-party code
+    "public/zxing/**",
+    "public/mediapipe/**",
   ]),
 ]);
 

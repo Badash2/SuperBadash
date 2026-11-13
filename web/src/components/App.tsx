@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "./Scanner";
 import { isKioskDevice } from "./Kiosk";
-import { RanOutView, type ConsumedRow } from "./RanOutView";
+import { RanOutView, type ConsumedRow, type PhotoReminder } from "./RanOutView";
 import { SettingsView } from "./SettingsView";
 import { ProductSheet } from "./ProductSheet";
 import { notifyEvent } from "@/lib/push";
@@ -211,6 +211,7 @@ function Main({ session }: { session: Session }) {
   // Main is rendered only on the client (after login), so localStorage can be read in the initialiser
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
   const [ranOutRows, setRanOutRows] = useState<ConsumedRow[]>([]);
+  const [photoRows, setPhotoRows] = useState<PhotoReminder[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [scanning, setScanning] = useState(false);
   const [openCode, setOpenCode] = useState<string | null>(null);
@@ -245,6 +246,14 @@ function Main({ session }: { session: Session }) {
       .gte("scanned_at", since)
       .order("scanned_at", { ascending: false });
     if (data) setRanOutRows(data as ConsumedRow[]);
+    // photo reminders from the bin scanner (items without a barcode) - only new ones, from the last 30 days
+    const { data: ph } = await supabase
+      .from("photo_reminders")
+      .select("id,photo_path,created_at,scanned_as,status")
+      .eq("status", "new")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false });
+    if (ph) setPhotoRows(ph as PhotoReminder[]);
     setNow(Date.now());
   }, []);
 
@@ -319,6 +328,11 @@ function Main({ session }: { session: Session }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "consumed_items" },
+        () => loadRanOut(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "photo_reminders" },
         () => loadRanOut(),
       )
       .subscribe();
@@ -441,11 +455,13 @@ function Main({ session }: { session: Session }) {
     name,
     toCart = false,
     weighted = false,
+    photo_path = null,
   }: {
     code: string | null;
     name: string;
     toCart?: boolean;
     weighted?: boolean;
+    photo_path?: string | null;
   }) => {
     const existing = items.find(
       (i) => !i.checked && (code ? i.code === code : i.name === name),
@@ -470,6 +486,7 @@ function Main({ session }: { session: Session }) {
         code,
         name,
         unit: defaultUnit(name, { code, weighted }) satisfies Unit,
+        ...(photo_path ? { photo_path } : {}),
         ...cart,
       })
       .select()
@@ -537,8 +554,8 @@ function Main({ session }: { session: Session }) {
         ranOutRows
           .filter((r) => r.status === "new" && !onListCodes.has(r.code))
           .map((r) => r.code),
-      ).size,
-    [ranOutRows, onListCodes],
+      ).size + photoRows.length,
+    [ranOutRows, onListCodes, photoRows],
   );
   const markRanOut = async (code: string, status: "added" | "dismissed") => {
     setRanOutRows((prev) =>
@@ -557,6 +574,29 @@ function Main({ session }: { session: Session }) {
     await markRanOut(g.code, "added");
   };
   const onRanOutHide = (code: string) => markRanOut(code, "dismissed");
+
+  // Photo reminders: to the list (with a name if given) or hide. Nothing goes in on its own.
+  const markPhoto = async (
+    id: string,
+    status: "added" | "dismissed",
+    item_name?: string,
+  ) => {
+    setPhotoRows((prev) => prev.filter((p) => p.id !== id));
+    await supabase
+      .from("photo_reminders")
+      .update({
+        status,
+        item_name: item_name ?? null,
+        handled_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+  };
+  const onPhotoAdd = async (p: PhotoReminder, name: string) => {
+    const n = name.trim() || "פריט מצולם";
+    await onAdd({ code: null, name: n, photo_path: p.photo_path });
+    await markPhoto(p.id, "added", n);
+  };
+  const onPhotoHide = (p: PhotoReminder) => markPhoto(p.id, "dismissed");
 
   const onFinish = async () => {
     const done = items
@@ -697,6 +737,9 @@ function Main({ session }: { session: Session }) {
         {tab === "ranout" && (
           <RanOutView
             rows={ranOutRows}
+            photos={photoRows}
+            onPhotoAdd={onPhotoAdd}
+            onPhotoHide={onPhotoHide}
             onList={onListCodes}
             now={now}
             onAdd={onRanOutAdd}

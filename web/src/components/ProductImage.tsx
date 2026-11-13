@@ -8,11 +8,14 @@ export function ProductImage({
   fallbackUrl,
   size = 48,
   emoji = "🛒",
+  cover = false,
 }: {
   code: string | null;
   fallbackUrl?: string | null;
   size?: number;
   emoji?: string;
+  /** a photo (not a pack shot) - fill the square */
+  cover?: boolean;
 }) {
   const sources = [
     code && /^\d{8,14}$/.test(code)
@@ -38,7 +41,7 @@ export function ProductImage({
       alt=""
       loading="lazy"
       style={style}
-      className="shrink-0 rounded-xl bg-img object-contain p-0.5"
+      className={`shrink-0 rounded-xl bg-img ${cover && sources[idx] === fallbackUrl ? "object-cover" : "object-contain p-0.5"}`}
       onError={() => setIdx((i) => i + 1)}
     />
   );

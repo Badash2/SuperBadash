@@ -1,6 +1,16 @@
 "use client";
+import { useEffect, useState } from "react";
+import { signedUrls } from "@/lib/photos";
 import { displayName } from "@/lib/text";
 import { ProductImage } from "./ProductImage";
+
+export type PhotoReminder = {
+  id: string;
+  photo_path: string;
+  created_at: string;
+  scanned_as: string | null;
+  status: string;
+};
 
 export type ConsumedRow = {
   id: string;
@@ -32,6 +42,9 @@ function ago(iso: string, now: number): string {
  */
 export function RanOutView({
   rows,
+  photos,
+  onPhotoAdd,
+  onPhotoHide,
   onList,
   now,
   onAdd,
@@ -39,6 +52,9 @@ export function RanOutView({
   onOpen,
 }: {
   rows: ConsumedRow[];
+  photos: PhotoReminder[];
+  onPhotoAdd: (p: PhotoReminder, name: string) => void;
+  onPhotoHide: (p: PhotoReminder) => void;
   onList: Set<string>;
   now: number;
   onAdd: (g: { code: string; name: string }) => void;
@@ -73,7 +89,16 @@ export function RanOutView({
         מוסיפים רק מה שבאמת צריך.
       </p>
 
-      {list.length === 0 && (
+      {photos.length > 0 && (
+        <PhotoReminders
+          photos={photos}
+          now={now}
+          onAdd={onPhotoAdd}
+          onHide={onPhotoHide}
+        />
+      )}
+
+      {list.length === 0 && photos.length === 0 && (
         <div className="py-16 text-center">
           <div className="text-5xl">🗑️</div>
           <p className="mt-3 text-muted">עוד לא נסרק כלום ליד הפח.</p>
@@ -172,5 +197,84 @@ function Row({
       </div>
       {children}
     </li>
+  );
+}
+
+/** "Photo reminders": what was photographed by the bin (an open hand) - with a name and to the list, or hide. */
+function PhotoReminders({
+  photos,
+  now,
+  onAdd,
+  onHide,
+}: {
+  photos: PhotoReminder[];
+  now: number;
+  onAdd: (p: PhotoReminder, name: string) => void;
+  onHide: (p: PhotoReminder) => void;
+}) {
+  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [names, setNames] = useState<Record<string, string>>({});
+  const key = photos.map((p) => p.photo_path).join(",");
+  useEffect(() => {
+    const paths = key ? key.split(",") : [];
+    if (paths.length) signedUrls(paths).then(setUrls);
+  }, [key]);
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-2 px-1 text-sm font-bold text-muted">
+        📷 תזכורות מצולמות
+        <span className="rounded-full bg-surface-2 px-2 text-xs font-semibold">
+          {photos.length}
+        </span>
+      </h3>
+      <ul className="grid grid-cols-2 gap-3">
+        {photos.map((p) => (
+          <li
+            key={p.id}
+            className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-card"
+          >
+            {urls.get(p.photo_path) ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a signed link to a private photo
+              <img
+                src={urls.get(p.photo_path)}
+                alt="תזכורת מצולמת"
+                className="aspect-square w-full rounded-xl bg-surface-2 object-cover"
+              />
+            ) : (
+              <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-surface-2 text-3xl">
+                📷
+              </div>
+            )}
+            <div className="text-[11px] text-muted">
+              צולם {ago(p.created_at, now)}
+            </div>
+            <input
+              value={names[p.id] ?? ""}
+              onChange={(e) =>
+                setNames((prev) => ({ ...prev, [p.id]: e.target.value }))
+              }
+              placeholder="מה זה? (לא חובה)"
+              className="h-10 w-full rounded-xl border border-line bg-surface px-2 text-base text-fg outline-none focus:border-brand"
+            />
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => onHide(p)}
+                className="h-10 w-10 shrink-0 rounded-xl text-xl text-faint"
+                aria-label="לא צריך"
+                title="לא צריך"
+              >
+                ×
+              </button>
+              <button
+                onClick={() => onAdd(p, names[p.id] ?? "")}
+                className="h-10 flex-1 rounded-xl bg-brand text-sm font-bold text-brand-fg active:bg-brand-strong"
+              >
+                + לרשימה
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

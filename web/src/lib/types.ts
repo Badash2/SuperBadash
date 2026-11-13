@@ -6,6 +6,7 @@ export type ListItem = {
   name: string;
   quantity: number;
   unit: "units" | "kg";
+  photo_path?: string | null; // a photo reminder from the bin scanner
   note: string | null;
   added_by: string;
   added_at: string;

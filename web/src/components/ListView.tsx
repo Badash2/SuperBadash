@@ -26,7 +26,8 @@ import { ProductImage } from "./ProductImage";
 import { NutritionChip } from "./NutritionChip";
 import { displayName } from "@/lib/text";
 import { formatQty, itemEmoji, UNIT_LABEL } from "@/lib/produce";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { signedUrls } from "@/lib/photos";
 
 type Props = {
   items: ListItem[];
@@ -50,6 +51,16 @@ type Props = {
 };
 
 export function ListView(p: Props) {
+  // signed links for photos of items that came from a photo reminder
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
+  const photoKey = p.items
+    .map((i) => i.photo_path)
+    .filter(Boolean)
+    .join(",");
+  useEffect(() => {
+    const paths = photoKey ? photoKey.split(",") : [];
+    if (paths.length) signedUrls(paths).then(setPhotoUrls);
+  }, [photoKey]);
   // A tip shown once per device (localStorage = a personal convenience; works without it too)
   const [tipSeen, setTipSeen] = useState(() => {
     try {
@@ -158,7 +169,16 @@ export function ListView(p: Props) {
             </h3>
             <ul className="space-y-2">
               {list.map((it) => (
-                <Row key={it.id} it={it} section={sid} {...p} who={who} />
+                <Row
+                  key={it.id}
+                  it={it}
+                  section={sid}
+                  {...p}
+                  photoUrl={
+                    it.photo_path ? photoUrls.get(it.photo_path) : undefined
+                  }
+                  who={who}
+                />
               ))}
             </ul>
           </section>
@@ -185,6 +205,9 @@ export function ListView(p: Props) {
                 it={it}
                 section={sectionOf(it)}
                 {...p}
+                photoUrl={
+                  it.photo_path ? photoUrls.get(it.photo_path) : undefined
+                }
                 who={who}
               />
             ))}
@@ -198,6 +221,7 @@ export function ListView(p: Props) {
 function Row({
   it,
   section,
+  photoUrl,
   onUnit,
   onOpenProduct,
   prices,
@@ -208,7 +232,12 @@ function Row({
   onDelete,
   onSetCategory,
   who,
-}: Props & { it: ListItem; section: string; who: (e: string) => string }) {
+}: Props & {
+  it: ListItem;
+  section: string;
+  who: (e: string) => string;
+  photoUrl?: string;
+}) {
   const byStore = it.code ? prices.get(it.code) : undefined;
   const best = cheapest(byStore, it.quantity);
   const here: PriceRow | undefined = currentStore
@@ -253,7 +282,8 @@ function Row({
       >
         <ProductImage
           code={it.code}
-          fallbackUrl={info?.image_url}
+          fallbackUrl={photoUrl ?? info?.image_url}
+          cover={!!photoUrl}
           size={48}
           emoji={itemEmoji(it.name) ?? SECTION_BY_ID.get(section)?.emoji}
         />

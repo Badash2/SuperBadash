@@ -114,3 +114,23 @@ export function beep(ok = true) {
     }
   } catch {}
 }
+
+/** A short tick for each second of the countdown. */
+export function tick() {
+  const c = ctx();
+  if (!c || c.state !== "running") return;
+  try {
+    tone(c, 1200, c.currentTime + 0.01, 0.05, 0.07);
+  } catch {}
+}
+
+/** A camera-shutter sound: two quick tones going up. */
+export function shutter() {
+  const c = ctx();
+  if (!c || c.state !== "running") return;
+  const t = c.currentTime + 0.01;
+  try {
+    tone(c, 1800, t, 0.06, 0.1);
+    tone(c, 2600, t + 0.08, 0.08, 0.1);
+  } catch {}
+}
