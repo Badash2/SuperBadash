@@ -1,12 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createDetector } from "@/lib/barcode";
 
-type Detector = {
-  detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
-};
 type Mode = "list" | "cart";
-
-const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
 
 /**
  * Barcode scanning with the camera. On Android (Chrome) the browser's built-in BarcodeDetector is
@@ -54,20 +50,8 @@ export function Scanner({
         v.srcObject = stream;
         await v.play();
 
-        let detector: Detector;
-        const Native = (
-          globalThis as unknown as {
-            BarcodeDetector?: new (o: object) => Detector;
-          }
-        ).BarcodeDetector;
-        if (Native) {
-          detector = new Native({ formats: FORMATS });
-        } else {
-          const { BarcodeDetector } = await import("barcode-detector/ponyfill");
-          detector = new BarcodeDetector({
-            formats: FORMATS as never,
-          }) as unknown as Detector;
-        }
+        // One shared module for the in-app scanner and the bin scanner (the engine is served from our site)
+        const detector = await createDetector();
         setStatus("כוונו את הברקוד למסגרת");
 
         const tick = async () => {

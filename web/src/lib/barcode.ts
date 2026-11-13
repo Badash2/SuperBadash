@@ -19,7 +19,13 @@ export async function createDetector(): Promise<Detector> {
     globalThis as unknown as { BarcodeDetector?: new (o: object) => Detector }
   ).BarcodeDetector;
   if (Native) return new Native({ formats: BARCODE_FORMATS });
-  const { BarcodeDetector } = await import("barcode-detector/ponyfill");
+  const { BarcodeDetector, prepareZXingModule } = await import("barcode-detector/ponyfill");
+  // The engine (WASM) is served from our own site (public/zxing, copied at build), not from an external CDN
+  prepareZXingModule({
+    overrides: {
+      locateFile: (path: string, prefix: string) => (path.endsWith(".wasm") ? `/zxing/${path}` : prefix + path),
+    },
+  });
   return new BarcodeDetector({
     formats: BARCODE_FORMATS as never,
   }) as unknown as Detector;

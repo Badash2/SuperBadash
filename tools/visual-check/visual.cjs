@@ -143,7 +143,7 @@ async function simulateHistory(code) {
   const browser = await chromium.launch({
     args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${OUT}/barcode.y4m`],
   });
-  const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: SCHEME, permissions: ["camera"] });
+  const ctx = await browser.newContext({ ...devices["Pixel 7"], locale: "he-IL", colorScheme: SCHEME, permissions: ["camera", "notifications"] });
   await ctx.route(`https://${REF}.supabase.co/rest/v1/**`, handle);
   // Storage (photo uploads): a fake reply; recorded so we can check an upload happened
   const uploads = [];
@@ -160,6 +160,8 @@ async function simulateHistory(code) {
   const page = await ctx.newPage();
   PAGE = page;
   page.on("pageerror", (e) => errors.push(e.message));
+  // A product image missing from the image server (404 -> ORB) is expected: the site falls back to a symbol
+  page.on("requestfailed", (r) => { const t = r.failure()?.errorText ?? ""; if (!t.includes("ERR_BLOCKED_BY_ORB")) errors.push("FAILED-REQ " + new URL(r.url()).host + " " + t); });
   page.on("console", (m) => { if (m.type() === "error" && !/websocket|realtime/i.test(m.text())) errors.push(m.text()); });
 
   await page.goto(BASE + "/");
