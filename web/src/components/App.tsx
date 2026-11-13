@@ -10,12 +10,13 @@ import { defaultUnit, stepQty, switchUnit, type Unit } from "@/lib/produce";
 import { itemKey } from "@/lib/categories";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type {
-  ListItem,
-  Member,
-  PriceRow,
-  ProductInfo,
-  Store,
+import {
+  isPerson,
+  type ListItem,
+  type Member,
+  type PriceRow,
+  type ProductInfo,
+  type Store,
 } from "@/lib/types";
 import { toPriceMap } from "@/lib/pricing";
 import { fetchProductInfo, normalizeInfo } from "@/lib/nutrition";
@@ -271,7 +272,7 @@ function Main({ session }: { session: Session }) {
           .select("store_key,name,chain")
           .eq("role", "primary")
           .order("store_key"),
-        supabase.from("family_members").select("email,display_name"),
+        supabase.from("family_members").select("*"),
         supabase
           .from("purchases")
           .select("code")
@@ -298,7 +299,7 @@ function Main({ session }: { session: Session }) {
           ...((extra.data as Store[]) ?? []),
         ].filter((x) => x.store_key !== "rami-levy-orzim"),
       );
-      setMembers((m.data as Member[]) ?? []);
+      setMembers(((m.data as Member[]) ?? []).filter(isPerson));
       setBoughtCodes([
         ...new Set(((p.data as { code: string }[]) ?? []).map((r) => r.code)),
       ]);

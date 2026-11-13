@@ -63,4 +63,11 @@ export type ProductInfo = {
   v?: number;
 };
 
-export type Member = { email: string; display_name: string | null };
+/** A family member. is_device = an approved account that isn't a person (the bin scanner): excluded from people lists. */
+export type Member = {
+  email: string;
+  display_name: string | null;
+  is_device?: boolean;
+};
+export const isPerson = (m: { is_device?: boolean | null }) =>
+  m.is_device !== true;

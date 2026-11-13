@@ -7,6 +7,7 @@ import { fetchProductInfo } from "@/lib/nutrition";
 import { displayName } from "@/lib/text";
 import { ProductImage } from "./ProductImage";
 import { notifyEvent } from "@/lib/push";
+import { isPerson, type Member } from "@/lib/types";
 
 const KIOSK_FLAG = "kioskMode";
 const SAME_CODE_COOLDOWN_MS = 8000; // the same product scanned twice in a row = one scan
@@ -100,11 +101,10 @@ function Station() {
   useEffect(() => {
     supabase
       .from("family_members")
-      .select("email,display_name")
+      .select("*")
       .then(({ data }) =>
-        setMembers(
-          (data as { email: string; display_name: string | null }[]) ?? [],
-        ),
+        // "who's scanning" - people only (not the scanner's own account)
+        setMembers(((data as Member[]) ?? []).filter(isPerson)),
       );
   }, []);
   const [now, setNow] = useState(() => Date.now());

@@ -61,16 +61,19 @@ export type Family = {
 
 export async function loadFamily(db: SupabaseClient): Promise<Family> {
   const [m, p] = await Promise.all([
-    db.from("family_members").select("email,display_name"),
+    db.from("family_members").select("*"),
     db.from("notification_prefs").select("*"),
   ]);
   // A DB error must not look like "no data" (that's how a missing privilege hid behind "ok")
   if (m.error) throw new DbError(`family_members: ${m.error.message}`);
   if (p.error) throw new DbError(`notification_prefs: ${p.error.message}`);
-  const rows = (m.data ?? []) as {
+  const all = (m.data ?? []) as {
     email: string;
     display_name: string | null;
+    is_device?: boolean;
   }[];
+  // Device accounts (the bin scanner) don't get notifications; names - for everyone (for display)
+  const rows = all.filter((r) => r.is_device !== true);
   if (rows.length === 0)
     throw new DbError(
       "family_members is empty - the server doesn't see the family",
@@ -78,7 +81,7 @@ export async function loadFamily(db: SupabaseClient): Promise<Family> {
   return {
     members: rows.map((r) => r.email),
     names: new Map(
-      rows.map((r) => [
+      all.map((r) => [
         r.email.toLowerCase(),
         r.display_name || r.email.split("@")[0],
       ]),
